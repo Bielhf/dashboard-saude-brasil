@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setor de Saúde Brasil — Base para Análise Financeira</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Tipografia: Calibri (fonte de sistema; sem dependência externa) -->
+<style>
+  :root{
+    --bg:#f6f8f9; --card:#ffffff; --ink:#15282e; --ink-2:#52676e; --ink-3:#8aa0a6;
+    --accent:#4a86d8; --accent-soft:#e8edf9; --accent-dark:#2a3157;
+    --amber:#b45309; --amber-soft:#fef3e2; --red:#b91c1c; --red-soft:#fdeaea;
+    --blue:#44609c; --blue-soft:#e8ecf6;
+    --border:#e4eaec; --radius:14px;
+    --shadow:0 1px 2px rgba(21,40,46,.05),0 4px 16px rgba(21,40,46,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Calibri,'Segoe UI',Candara,system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;font-size:15px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- header ---------- */
+  header{background:linear-gradient(135deg,#2a3157 0%,#44609c 55%,#4a86d8 100%);color:#fff;padding:42px 32px 88px}
+  .hwrap{max-width:1180px;margin:0 auto}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;font-weight:600;margin-bottom:10px}
+  header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+  header p.sub{margin-top:10px;max-width:760px;opacity:.85;font-size:15px}
+  .meta{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:600}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);margin-top:-52px}
+  .nwrap{max-width:1180px;margin:0 auto;display:flex;gap:4px;padding:10px 24px;overflow-x:auto}
+  .tabbtn{border:0;background:transparent;font:inherit;font-weight:600;font-size:13.5px;color:var(--ink-2);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .tabbtn:hover{background:var(--accent-soft);color:var(--accent-dark)}
+  .tabbtn.active{background:var(--accent);color:#fff}
+
+  main{max-width:1180px;margin:0 auto;padding:30px 24px 80px}
+  section.tab{display:none}
+  section.tab.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  h2{font-size:21px;font-weight:800;letter-spacing:-.01em;margin:34px 0 6px}
+  h2:first-child{margin-top:6px}
+  p.lead{color:var(--ink-2);max-width:860px;margin-bottom:18px}
+  h3{font-size:15px;font-weight:700;margin-bottom:8px}
+
+  /* ---------- cards & grids ---------- */
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .kpi .v{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--accent-dark)}
+  .kpi .l{font-size:12.5px;color:var(--ink-2);margin-top:4px;font-weight:500}
+  .kpi .s{font-size:11px;color:var(--ink-3);margin-top:6px}
+  .cards2{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow)}
+  .card h3{display:flex;align-items:center;gap:8px}
+  .card .src{font-size:11px;color:var(--ink-3);margin-top:10px}
+  .chartbox{position:relative;height:280px;margin-top:12px}
+
+  .note{background:var(--amber-soft);border:1px solid #f3ddb8;border-radius:var(--radius);padding:14px 18px;font-size:13px;color:#7c4a08;margin:18px 0}
+  .note b{color:#92400e}
+
+  /* ---------- value chain ---------- */
+  .chain{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-top:14px}
+  .chain .node{flex:1;min-width:200px;background:var(--card);border:1px solid var(--border);border-top:4px solid var(--accent);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+  .chain .node h4{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--accent-dark)}
+  .chain .node p{font-size:12.5px;color:var(--ink-2)}
+  .chain .node .tk{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+  .tick{font-size:10.5px;font-weight:700;background:var(--accent-soft);color:var(--accent-dark);border-radius:6px;padding:2px 7px;letter-spacing:.02em}
+  .tick.gray{background:#eef1f2;color:var(--ink-2)}
+
+  /* ---------- drivers ---------- */
+  .horiz{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+  .dcol h3{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin:0 0 12px}
+  .driver{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .driver.mid{border-left-color:var(--blue)}
+  .driver.long{border-left-color:var(--amber)}
+  .driver b{font-size:13.5px}
+  .driver p{font-size:12.5px;color:var(--ink-2);margin-top:4px}
+  .pill{display:inline-block;font-size:10px;font-weight:700;border-radius:6px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  .pill.up{background:var(--accent-soft);color:var(--accent-dark)}
+  .pill.down{background:var(--red-soft);color:var(--red)}
+  .pill.mix{background:var(--blue-soft);color:var(--blue)}
+
+  /* ---------- timeline ---------- */
+  .timeline{position:relative;margin:20px 0 10px;padding-left:30px}
+  .timeline::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--accent),var(--blue))}
+  .tl{position:relative;margin-bottom:18px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;box-shadow:var(--shadow)}
+  .tl::before{content:"";position:absolute;left:-27px;top:18px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:3px solid var(--bg)}
+  .tl .yr{font-size:12px;font-weight:800;color:var(--accent-dark);letter-spacing:.06em}
+  .tl b{font-size:14px;display:block;margin:2px 0 4px}
+  .tl p{font-size:13px;color:var(--ink-2)}
+
+  /* ---------- table ---------- */
+  .tablecard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto;margin-top:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:880px}
+  th{background:#f0f4f5;text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);border-bottom:1px solid var(--border)}
+  td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tr.seg td{background:var(--accent-soft);font-weight:800;font-size:12px;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.06em;padding:7px 14px}
+  td .tk2{font-weight:700;color:var(--accent-dark)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  td .small{font-size:12px;color:var(--ink-2)}
+
+  /* ---------- horizonte dos drivers ---------- */
+  .ibar{height:6px;border-radius:4px;background:#e8edee;margin-top:10px;overflow:hidden}
+  .ibar i{display:block;height:100%;border-radius:4px}
+  .dmeta{font-size:11.5px;color:var(--ink-3);margin-top:6px;display:flex;gap:12px;flex-wrap:wrap}
+  .dmeta b{color:var(--ink-2);font-weight:600}
+  .hleg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:10px}
+  .hleg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .hleg .l1::before{background:var(--accent)} .hleg .l2::before{background:var(--blue)} .hleg .l3::before{background:var(--amber)}
+
+  /* ---------- export buttons ---------- */
+  .xlsbtn{position:absolute;top:8px;right:8px;z-index:5;display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:var(--accent-dark);background:rgba(255,255,255,.86);border:1px solid var(--border);border-radius:7px;padding:3px 8px;cursor:pointer;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);transition:background .15s,color .15s}
+  .xlsbtn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .xls-all{position:fixed;right:18px;bottom:18px;z-index:200;display:inline-flex;align-items:center;gap:7px;font-family:inherit;font-size:13px;font-weight:700;color:#fff;background:var(--accent);border:0;border-radius:30px;padding:11px 18px;cursor:pointer;box-shadow:0 4px 16px rgba(42,49,87,.28)}
+  .xls-all:hover{background:var(--accent-dark)}
+  @media print{.xlsbtn,.xls-all{display:none}}
+
+  footer{border-top:1px solid var(--border);padding:26px 24px 50px;color:var(--ink-3);font-size:12px;text-align:center}
+  @media (max-width:640px){ .cards2{grid-template-columns:1fr} header h1{font-size:24px} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <div class="eyebrow">Equity Research · Healthcare Brasil</div>
+    <h1>Setor de Saúde no Brasil — Base Setorial &amp; Players Listados</h1>
+    <p class="sub">Documento-base para análise financeira: estrutura do setor, drivers de curto/médio/longo prazo, histórico regulatório e mapa das companhias listadas — fundação para construção de premissas e modelos.</p>
+    <div class="meta">
+      <span class="chip">v1.3 · jun/2026</span>
+      <span class="chip">Compilado: jun/2026</span>
+      <span class="chip">Dados: ANS · IBGE · DATASUS · IESS · ANAHP · RI das cias</span>
+    </div>
+  </div>
+</header>
+
+<nav><div class="nwrap">
+  <button class="tabbtn active" data-tab="visao">Visão Geral</button>
+  <button class="tabbtn" data-tab="recap">Re-Cap Setor de Saúde</button>
+  <button class="tabbtn" data-tab="drivers">Drivers</button>
+  <button class="tabbtn" data-tab="horizonte">Horizonte dos Drivers</button>
+  <button class="tabbtn" data-tab="historia">História &amp; Regulação</button>
+  <button class="tabbtn" data-tab="competicao">Competição</button>
+  <button class="tabbtn" data-tab="hospitais">Cadeia Hospitalar</button>
+  <button class="tabbtn" data-tab="mundo">Brasil × Mundo</button>
+  <button class="tabbtn" data-tab="players">Players Listados</button>
+  <button class="tabbtn" data-tab="premissas">Premissas &amp; Cenários</button>
+  <button class="tabbtn" data-tab="fontes">Fontes</button>
+</div></nav>
+
+<main>
+
+<!-- ================= VISÃO GERAL ================= -->
+<section class="tab active" id="visao">
+  <h2>O setor em uma página</h2>
+  <p class="lead">O Brasil opera um sistema dual: o <b>SUS</b>, universal e financiado por impostos, cobre toda a população; a <b>saúde suplementar</b> (planos privados, regulados pela ANS) cobre ~26% dela, mas concentra a maior parte do fluxo financeiro privado — e é onde vivem quase todos os players listados em bolsa.</p>
+
+  <div class="grid kpis">
+    <div class="kpi"><div class="v">~R$ 1,16 tri</div><div class="l">Gasto total em saúde (2024e)</div><div class="s">≈ 9% do PIB · ANAHP/IBGE</div></div>
+    <div class="kpi"><div class="v">53,0 mi</div><div class="l">Beneficiários de planos médico-hospitalares</div><div class="s">mar/2026 · +3,6% a/a · recorde da série · ANS</div></div>
+    <div class="kpi"><div class="v">35,8 mi</div><div class="l">Beneficiários exclusivamente odontológicos</div><div class="s">mar/2026 · ANS</div></div>
+    <div class="kpi"><div class="v">81,7%</div><div class="l">Sinistralidade das operadoras em 2025</div><div class="s">Menor desde 2020 · med. de grupo 77,2% / seguradoras 82,3% · ANS</div></div>
+    <div class="kpi"><div class="v">R$ 24,4 bi</div><div class="l">Lucro líquido das operadoras em 2025</div><div class="s">+121% a/a · recorde nominal da série · ANS</div></div>
+    <div class="kpi"><div class="v">R$ 391,6 bi</div><div class="l">Receita das operadoras em 2025</div><div class="s">Contraprestações · ANS</div></div>
+    <div class="kpi"><div class="v">~670</div><div class="l">Operadoras médico-hospitalares ativas</div><div class="s">Consolidação contínua · ANS</div></div>
+    <div class="kpi"><div class="v">~10,9%</div><div class="l">População 65+ (Censo 2022)</div><div class="s">Rumo a ~22% em 2050 · IBGE</div></div>
+  </div>
+
+  <div class="note"><b>Status dos dados:</b> indicadores setoriais (beneficiários, sinistralidade, reajustes, resultado) validados nas divulgações oficiais da ANS até mai/2026. Números das companhias (aba Players) seguem como aproximações de 2024, pendentes de atualização via CVM/RI. Os dados ficam centralizados no bloco <code>DATA</code> no código deste arquivo — fácil de atualizar.</div>
+
+  <h2>Peculiaridade central: gasto privado &gt; gasto público</h2>
+  <p class="lead">Apesar do sistema universal, o Brasil é um dos poucos países onde o gasto privado supera o público (~58% vs ~42%). Isso cria um mercado privado profundo — e explica a quantidade de companhias de saúde listadas na B3.</p>
+
+  <div class="grid cards2">
+    <div class="card">
+      <h3>Gasto em saúde — público vs privado (2024e)</h3>
+      <div class="chartbox"><canvas id="chGasto"></canvas></div>
+      <div class="src">Fonte: Conta-Satélite de Saúde (IBGE) / Observatório ANAHP 2025. Valores aproximados.</div>
+    </div>
+    <div class="card">
+      <h3>Beneficiários de planos — série oficial 2000–2026 (mi)</h3>
+      <div class="chartbox"><canvas id="chBenef"></canvas></div>
+      <div class="src">Fonte: ANS/TABNET (extração própria, dez de cada ano; 2026 = mar). Médico-hospitalar: recorde de 53,0 mi em dez/25, leve acomodação no 1T26. Note os dois ciclos: crescimento 2000–14, crise 2015–19, retomada pós-2020. Odontológico: 13x em 25 anos (2,6 → 35,8 mi) e ainda acelerando.</div>
+    </div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:16px">
+    <div class="card">
+      <h3>Taxa de cobertura dos planos — % da população (2000–2026)</h3>
+      <div class="chartbox"><canvas id="chCobertura"></canvas></div>
+      <div class="src">Fonte: ANS/TABNET (extração própria; dez de cada ano, 2026 = abr). De 14,5% para 24,9% em 26 anos — mas o avanço travou na faixa de 22–24% desde 2014: o teto da renda. Romper esse teto (produto acessível, reforma regulatória) é a tese de crescimento de longo prazo do setor.</div>
+    </div>
+    <div class="card">
+      <h3>Gasto em saúde — % do PIB, público × privado (2010–2021 + 2025e)</h3>
+      <div class="chartbox"><canvas id="chGastoPib"></canvas></div>
+      <div class="src">Fonte: Conta-Satélite de Saúde/IBGE (série anual oficial, extraída do relatório 2010–2021); 2025e = ANAHP, rateio pela proporção em R$. O gasto subiu de 8,0% para ~9,7% do PIB — mas todo o crescimento veio do privado (famílias: 4,4% → 5,7–5,9%), com o governo estável em ~3,4–4,0%. País rico no gasto, emergente no gasto público.</div>
+    </div>
+  </div>
+
+  <h2>Cadeia de valor — onde cada player listado se encaixa</h2>
+  <div class="chain">
+    <div class="node"><h4>1 · Fontes pagadoras</h4><p>Operadoras e seguradoras (reguladas pela ANS) + SUS + desembolso direto. Capturam o prêmio; risco atuarial e de sinistralidade.</p>
+      <div class="tk"><span class="tick">HAPV3</span><span class="tick">RDOR3 (SulAmérica)</span><span class="tick">SAUD3 (Bradesco Saúde + Odontoprev)</span><span class="tick">QUAL3*</span><span class="tick gray">Amil</span><span class="tick gray">Unimeds</span></div></div>
+    <div class="node"><h4>2 · Prestadores</h4><p>Hospitais, clínicas, oncologia e medicina diagnóstica. Recebem das operadoras (risco de glosa e prazo) e do SUS.</p>
+      <div class="tk"><span class="tick">RDOR3</span><span class="tick">ONCO3</span><span class="tick">MATD3</span><span class="tick">DASA3</span><span class="tick">FLRY3</span><span class="tick gray">Einstein/Sírio (filantr.)</span></div></div>
+    <div class="node"><h4>3 · Indústria</h4><p>Farmacêuticas e dispositivos médicos. Preço de medicamentos regulado pela CMED; pipeline e genéricos/biossimilares.</p>
+      <div class="tk"><span class="tick">HYPE3</span><span class="tick">BLAU3</span><span class="tick gray">EMS, Eurofarma (fechadas)</span></div></div>
+    <div class="node"><h4>4 · Distribuição &amp; varejo</h4><p>Varejo farmacêutico e distribuição de materiais/medicamentos hospitalares. Margens finas, escala e logística.</p>
+      <div class="tk"><span class="tick">RADL3</span><span class="tick">PGMN3</span><span class="tick">PNVL3</span><span class="tick">VVEO3</span></div></div>
+  </div>
+  <p class="src" style="margin-top:10px;font-size:11px;color:var(--ink-3)">* QUAL3 é administradora de benefícios (intermediação), não carrega risco de sinistro. Tendência estrutural do setor: <b>verticalização</b> — operadoras comprando prestadores (Hapvida) e prestadores comprando operadoras (Rede D'Or + SulAmérica).</p>
+</section>
+
+<!-- ================= RE-CAP SETOR DE SAÚDE ================= -->
+<section class="tab" id="recap">
+  <h2>Re-Cap do Setor de Saúde — os 101s</h2>
+  <p class="lead">Os fundamentos do setor de saúde suplementar em uma leitura: como o sistema é estruturado, quem são os agentes e o que distorce seus incentivos, o ciclo recente, a mecânica financeira do prestador (hospital) e do pagador (operadora), e a moldura regulatória. É a base conceitual antes de qualquer tese ou modelo.</p>
+
+  <h2>1 · O sistema e a estrutura</h2>
+  <p class="lead">Dois sistemas em paralelo — e uma distorção de incentivos no centro: quem consome não é quem paga, e quem regula cada vértice é diferente.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>SUS · ~75% da população</h3><p>Custeado por tributos, não fatura pelo serviço. É a alternativa quando o paciente cai do plano — por isso afeta o churn e torna o reajuste politicamente sensível.</p></div>
+    <div class="card"><h3>Suplementar · ~25% · ~53 mi vidas</h3><p>Onde rodam as listadas: Rede D'Or, Hapvida, Fleury, Mater Dei, Dasa e Odontoprev. Concentra a maior parte do fluxo financeiro privado.</p></div>
+  </div>
+  <h3 style="margin-top:22px">O triângulo da saúde suplementar</h3>
+  <div class="chain">
+    <div class="node"><h4>Beneficiário</h4><p>Paga a mensalidade (prêmio) todo mês, mesmo sem usar. Como <b>já pagou</b>, não tem incentivo de economia no momento do consumo.</p></div>
+    <div class="node"><h4>Operadora (pagador)</h4><p>Recebe o prêmio, carrega o risco e paga o prestador. <b>Está ausente</b> no momento do consumo — não decide o que é feito.</p></div>
+    <div class="node"><h4>Prestador</h4><p>Hospital, laboratório, clínica, médico. Atende e fatura à operadora. <b>Remunerado por volume</b>: ganha mais quanto mais faz.</p></div>
+  </div>
+  <div class="note"><b>A distorção central:</b> consumidor sem incentivo a economizar + pagador ausente no consumo + prestador remunerado por volume. Essa distorção de incentivos é o que toda regulação e inovação contratual (verticalização, capitation, value-based) tenta atacar.</div>
+  <div class="grid cards2">
+    <div class="card"><h3>Reguladores</h3><p>A <b>ANS</b> fica sobre a operadora: cobertura, reajuste do plano individual e solvência. <b>Anvisa</b> e vigilância sanitária (estadual/municipal) ficam sobre o hospital. O hospital sofre a regulação por reflexo, via operadora.</p></div>
+    <div class="card"><h3>Por que importa</h3><p>O vértice regulado define onde o custo da inovação e da judicialização recai. Mudanças de regra na ANS atingem a operadora primeiro — e chegam ao prestador depois, pelo contrato.</p></div>
+  </div>
+
+  <h2>2 · Modalidades de operadora &amp; tipos de plano</h2>
+  <p class="lead">O que distingue a <b>modalidade</b> é a relação com o prestador. O que distingue o <b>plano</b> é o regime de reajuste.</p>
+  <div class="tablecard">
+    <table>
+      <thead><tr><th>Modalidade</th><th>Como funciona</th><th>Exemplos</th><th>Característica</th></tr></thead>
+      <tbody>
+        <tr><td><b>Seguradora especializada</b></td><td class="small">Sem rede própria; paga credenciado</td><td class="small">Bradesco, SulAmérica, Porto</td><td class="small">Ticket alto, cliente premium</td></tr>
+        <tr><td><b>Medicina de grupo (verticalizada)</b></td><td class="small">Rede própria; custo controlado</td><td class="small">Hapvida, NotreDame, Amil</td><td class="small">Ticket baixo, base popular</td></tr>
+        <tr><td><b>Cooperativa médica</b></td><td class="small">Associação de médicos autônomos</td><td class="small">Sistema Unimed (maior em vidas)</td><td class="small">Cada Unimed é uma empresa</td></tr>
+        <tr><td><b>Autogestão</b></td><td class="small">Planos próprios, sem fins lucrativos</td><td class="small">Cassi, Geap, Petrobras</td><td class="small">Fora do mercado aberto</td></tr>
+        <tr><td><b>Filantropia</b></td><td class="small">Organizada por santas casas</td><td class="small">—</td><td class="small">Depende de doações/subsídios</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="horiz" style="margin-top:18px">
+    <div class="driver"><b>Individual / Familiar</b><span class="pill mix">tabelado</span><p>Reajuste tabelado pela ANS (~9–16%). Operadora não rescinde ("fica presa"). Politicamente sensível — quase ninguém vende novo.</p></div>
+    <div class="driver"><b>Coletivo Empresarial · ~70%</b><span class="pill up">onde está o dinheiro</span><p>Contratado pela empresa. Reajuste livremente negociado, ligado à sinistralidade do contrato. É onde o dinheiro do setor está.</p></div>
+    <div class="driver mid"><b>Coletivo por Adesão</b><span class="pill mix">híbrido</span><p>Via associação ou conselho profissional. Perfil de risco próximo ao individual; exige transparência.</p></div>
+  </div>
+
+  <h2>3 · O ciclo recente: pandemia, inflexão, recuperação</h2>
+  <p class="lead">O pano de fundo de qualquer conversa sobre tese no setor de operadoras.</p>
+  <div class="timeline">
+    <div class="tl"><span class="yr">2020–21 · PANDEMIA</span><b>Eletiva cai, lucros excepcionais</b><p>Procedimentos eletivos represados, MLR abaixo de 70%, lucros excepcionais. Atraiu pressão regulatória e política.</p></div>
+    <div class="tl"><span class="yr">2022 · INFLEXÃO</span><b>Utilização volta + rol exemplificativo</b><p>A utilização represada voltou e o rol virou exemplificativo (Lei 14.454/22). MLR sobe; stress nas operadoras menores.</p></div>
+    <div class="tl"><span class="yr">2023 · PIOR ANO</span><b>MLR &gt; 87%, Hapvida no prejuízo</b><p>MLR acima de 87%, recuperações da ANS, Hapvida em prejuízo. SulAmérica chega à fusão com a Rede D'Or no pior do ciclo.</p></div>
+    <div class="tl"><span class="yr">2024–25 · RECUPERAÇÃO</span><b>Volta a 80–85%, acima do equilíbrio</b><p>Reajustes coletivos pesados em 2023–24. A maioria volta a 80–85% — ainda acima do ponto de equilíbrio.</p></div>
+  </div>
+  <div class="note"><b>A pergunta em aberto:</b> o patamar de equilíbrio "novo" é mais alto, porque o rol exemplificativo é estrutural? Ou a normalização eventualmente traz de volta o intervalo 75–80%?</div>
+
+  <h2>4 · O prestador (hospital): capital de giro &amp; glosas</h2>
+  <p class="lead">O paciente não paga e a operadora paga devagar. Por isso o DSO do hospital é estruturalmente alto e o capital de giro, estruturalmente negativo.</p>
+  <h3>Ciclo do capital de giro do hospital</h3>
+  <div class="chain">
+    <div class="node"><h4>1 · Atende e fatura</h4><p>Conta médica no padrão TISS/TUSS, sai 5–30 dias após a alta.</p></div>
+    <div class="node"><h4>2 · Operadora audita</h4><p>Prazo ~30 dias. Glosa o que considera indevido.</p></div>
+    <div class="node"><h4>3 · Hospital recorre</h4><p>Junta documentação e recupera uma fração em rodadas.</p></div>
+    <div class="node"><h4>4 · Glosa definitiva</h4><p>O que sobra após recursos vira perda real e impacta a margem.</p></div>
+    <div class="node"><h4>5 · Caixa líquido</h4><p>60 a 180 dias do atendimento até o caixa de fato.</p></div>
+  </div>
+  <div class="note"><b>Conta em elaboração:</b> receita já incorrida mas ainda não faturada à operadora — gargalo silencioso. A migração para sistema unificado (TASY, MV) é o primeiro efeito visível do turnaround de um hospital adquirido. O WC do hospital é função de: (1) prazo negociado com as operadoras, (2) eficiência de faturamento (quanto menor a glosa, melhor) e (3) mix pagador.</div>
+
+  <h3 style="margin-top:22px">Glosas — a rejeição de fatura como controle de custo</h3>
+  <p class="lead">Glosa é a rejeição, total ou parcial, de itens da fatura pela operadora — o único freio num modelo onde o pagador não está no consumo. Em tese, freia indução de demanda; na prática, é também alavanca de capital de giro.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Técnica / Clínica</h3><p>Rejeição por motivo médico: sem indicação documentada, exame redundante, UTI sem necessidade. A mais difícil de recuperar — depende de defesa clínica.</p></div>
+    <div class="card"><h3>Administrativa</h3><p>Erro de processo: TUSS errado, divergência de quantidade, guia mal preenchida, prazo de envio. A mais fácil de recuperar e de prevenir com bom sistema.</p></div>
+    <div class="card"><h3>Contratual</h3><p>Divergência sobre o que está contratado: tabela aplicada, pacote vs. avulso, materiais. A mais política — pesa o relacionamento comercial.</p></div>
+    <div class="card"><h3>OPME</h3><p>Órteses, próteses e materiais especiais. Lei 13.003/2014 e RN 428/2017 limitaram a margem do hospital. Hoje quase pass-through: o hospital compra e só recebe com o pagamento da operadora.</p></div>
+  </div>
+
+  <h3 style="margin-top:22px">Capital de giro estruturalmente negativo</h3>
+  <p class="lead">Cliente não paga, pagador é lento, fornecedor cobra rápido. Quanto mais o hospital cresce, mais caixa queima.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Ativos do ciclo</h3><p><b>Contas a receber:</b> quase tudo de operadoras; a composição por idade diz mais que o saldo. <b>Conta em elaboração:</b> receita incorrida não faturada (back office ruim carrega saldo; TASY/MV reduz). <b>Estoques:</b> medicamentos, descartáveis, OPME — 25–45d de CMV. <b>PDD:</b> operadora que atrasa estruturalmente puxa para cima.</p></div>
+    <div class="card"><h3>Passivos do ciclo</h3><p><b>Fornecedores:</b> farma 30–60d, OPME 60–90d (o grande extrai prazo melhor por escala); PMP 60–80d. <b>Folha:</b> encargos ~70% no CLT, sem barganha de prazo. <b>Honorários médicos:</b> a RDOR recebe tudo e repassa — cria o passivo de "honorários a pagar". <b>Impostos:</b> ISS, PIS/Cofins, IRPJ/CSLL.</p></div>
+    <div class="card"><h3>NCG e dinâmica</h3><p>NCG de 60–110 dias de receita. Quando a receita cresce, o AR cresce proporcional mas o fornecedor cresce menos: a NCG cresce em valor absoluto. Crescer 15% a.a. consome ~10–15% da receita incremental em working capital.</p></div>
+    <div class="card"><h3>M&amp;A: captura de WC</h3><p>O alvo tem NCG pior (back office imaturo, glosa maior, conta em elaboração inflada). Em 18–24 meses, a migração de sistema libera caixa não recorrente. <span style="color:var(--ink-3)">Métricas: PMR = AR/receita×90 · PME = estoque/CMV×90 · PMP = fornec/CMV×90 · Ciclo = PMR + PME − PMP.</span></p></div>
+  </div>
+
+  <h3 style="margin-top:22px">Como o hospital financia o gap</h3>
+  <div class="grid cards2">
+    <div class="card"><h3>FIDC · o canal em escala</h3><p>Cede um portfólio de recebíveis a um fundo que emite cotas seniores (a institucionais, ~CDI + centenas de bps) e subordinadas (retidas como first loss). O fundo paga à vista. Fica fora do balanço se "true sale" sem retenção de risco. <b>Quem rola muito FIDC tem dívida econômica maior que a contábil reportada.</b></p></div>
+    <div class="card"><h3>Antecipação de recebíveis</h3><p>Cede o direito sobre uma fatura e recebe à vista com desconto; o banco cobra a operadora no vencimento. Eficiente pontualmente, caro como prática contínua.</p></div>
+    <div class="card"><h3>Linhas &amp; postergação de fornecedor</h3><p>Linhas bancárias a CDI + 1,5–3%. Postergar fornecedor é o canal menos formal mas relevante em stress: estender o PMP de 70 para 90 dias libera WC, mas custa relacionamento e, eventualmente, custo.</p></div>
+    <div class="card"><h3>No fluxo de caixa (FCO)</h3><p>A variação de capital de giro captura o efeito líquido. Em ano de forte crescimento de receita, essa linha é fortemente negativa. <b>EBITDA bonito com capital de giro queimado é sinal amarelo</b> — leia os dois juntos.</p></div>
+  </div>
+
+  <h2>5 · O pagador (operadora): contabilidade, MLR &amp; float</h2>
+  <p class="lead">A operadora roda no ciclo invertido: recebe o prêmio antes de pagar o sinistro. O prêmio é fixo no contrato; o custo é variável e cresce com a utilização. Aí mora toda a tensão.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Float</h3><p>Recebe o prêmio antes de pagar o sinistro — financiamento de baixo custo, investido em renda fixa de alta qualidade.</p></div>
+    <div class="card"><h3>Earned vs. Unearned</h3><p>Paga-se adiantado por um serviço futuro. O prêmio é reconhecido ao longo da vigência, não na venda.</p></div>
+    <div class="card"><h3>Reservas e IBNR</h3><p>Sinistros são difíceis de prever; estimam-se os prováveis (matching principle). O IBNR é ajustado depois pelos sinistros reais.</p></div>
+    <div class="card"><h3>Investment income / fair value</h3><p>O float investido gera resultado. Ganhos não realizados vão ao resultado ou ao OCI, conforme o ativo.</p></div>
+  </div>
+  <div class="note"><b>Índices-chave:</b> Loss Ratio (sinistros/prêmios) · Expense Ratio (despesas de aquisição e serviço/prêmios) · Combined Ratio (comissões + despesas + sinistros/prêmios). <b>Combined ratio acima de 100% não significa prejuízo</b> — ele exclui o resultado de investimento (o ganho do float).</div>
+
+  <h3 style="margin-top:22px">Sinistralidade (MLR): intuição e composição</h3>
+  <p class="lead">MLR = Sinistros / Prêmios. A alavancagem é brutal: 78% → ~8% de margem · 85% → 1–2% · 90% → perde.</p>
+  <div class="grid kpis">
+    <div class="kpi"><div class="v" style="color:var(--accent-dark)">75–82%</div><div class="l">Saudável</div></div>
+    <div class="kpi"><div class="v" style="color:var(--amber)">&gt;85%</div><div class="l">Dói</div></div>
+    <div class="kpi"><div class="v" style="color:var(--red)">&gt;90%</div><div class="l">Destrói</div></div>
+    <div class="kpi"><div class="v" style="color:var(--ink-2)">87–92%</div><div class="l">Patamar pós-COVID</div></div>
+  </div>
+  <div class="grid cards2" style="margin-top:16px">
+    <div class="card"><h3>Composição dos sinistros (denominador)</h3><p><b>1. Internação hospitalar:</b> maior ticket, linha mais volátil (UTI, cirurgia, oncologia). <b>2. Consultas e exames:</b> alto volume; crescimento estrutural pela ampliação de cobertura, especialmente terapias para TEA. <b>3. Medicamentos de alto custo:</b> oncológicos, biológicos, gênicos (Zolgensma, Spinraza) — vetor inflacionário desde 2022. <b>4. Outras despesas:</b> telemedicina, navegação, gestão de crônicos. <b>5. Pronto-socorro:</b> demanda não programada, cara de gerenciar.</p></div>
+    <div class="card"><h3>Precificação atuarial (numerador)</h3><p>O prêmio tem três componentes: (1) custo médico esperado por beneficiário (idade, gênero, região, plano), (2) despesas administrativas e comerciais, (3) margem técnica desejada. Os reajustes anuais tentam manter a margem técnica positiva.<br><span style="color:var(--ink-3)">IFRS 17 (CPC 50, desde 2023): agregação por grupos, receita vira "Resultado de Serviços de Seguros". Use sempre o número gerencial (sinistro/prêmio).</span></p></div>
+  </div>
+
+  <h3 style="margin-top:22px">Float e provisões técnicas (ANS)</h3>
+  <p class="lead">Parte do caixa fica presa em garantia regulatória — não é caixa livre da holding.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>PEONA</h3><p>Eventos Ocorridos e Não Avisados: sinistro já ocorrido, operadora ainda não cientificada. A maior provisão.</p></div>
+    <div class="card"><h3>PESL</h3><p>Eventos a Liquidar: já avisados, em análise ou pagamento, ainda não pagos. Olha para trás.</p></div>
+    <div class="card"><h3>PIP</h3><p>Insuficiência de Prêmios: prêmios futuros insuficientes para sinistros futuros, em contratos onerosos. Olha para frente.</p></div>
+    <div class="card"><h3>Remissão</h3><p>Coberturas vitalícias a dependentes em caso de óbito do titular (produtos antigos).</p></div>
+  </div>
+  <div class="note"><b>O blend seguradora + hospital (RDOR + SULA):</b> a NCG do hospital consome caixa; o float da operadora gera caixa. O consolidado fica menos sensível ao ciclo, mas não zera (a NCG é muito maior em valor absoluto). Intercompany: paciente da SulAmérica em hospital RDOR vira eliminação — mas o preço de transferência tem de ser de mercado.</div>
+
+  <h2>6 · Regulação</h2>
+  <h3>Rol de procedimentos: piso ou teto?</h3>
+  <p class="lead">A pergunta aparentemente jurídica que define quem absorve o custo da inovação tecnológica em saúde.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>TETO (taxativo)</h3><p>A operadora só cobre o que está na lista. Controla o custo; o beneficiário paga do bolso o que ficar de fora.</p></div>
+    <div class="card"><h3>PISO (exemplificativo) · vigente</h3><p>Cobertura mínima: o médico pode prescrever fora. A operadora absorve o custo, e a judicialização preenche as lacunas.</p></div>
+  </div>
+  <div class="timeline" style="margin-top:18px">
+    <div class="tl"><span class="yr">ATO I · ATÉ 2022</span><b>Indefinição</b><p>Decisões divergiam entre instâncias e regiões; risco regulatório alto, litígios provisionados.</p></div>
+    <div class="tl"><span class="yr">ATO II · JUN/2022</span><b>STJ: rol taxativo</b><p>A 2ª Seção do STJ, por maioria apertada e em recursos repetitivos, decidiu o rol taxativo (cobertura fora só em hipóteses excepcionais). Vitória das operadoras.</p></div>
+    <div class="tl"><span class="yr">ATO III · SET/2022</span><b>Congresso: rol exemplificativo</b><p>Em três meses, a Lei 14.454/22: rol exemplificativo. Critérios: eficácia comprovada, recomendação da Conitec, inexistência de negativa expressa da ANS. Lei expressa, não só jurisprudência.</p></div>
+  </div>
+  <div class="note"><b>Estruturalmente inflacionário.</b> "Rol invisível" = rol formal + judicialização + ampliação caso a caso: terapias de TEA · alto custo e gênicos (Zolgensma, CAR-T) · tecnologia diagnóstica (exames genéticos, biomarcadores).</div>
+
+  <h3 style="margin-top:22px">Reajuste: três regimes e o ciclo de aniversários</h3>
+  <p class="lead">Tratar todos os planos como iguais é o erro mais comum da análise de superfície.</p>
+  <div class="horiz">
+    <div class="driver"><b>Individual / Familiar</b><span class="pill mix">teto ANS</span><p>Teto anual da ANS (RN 565: IVDA + IPCA + fator de qualidade). Operadora não rescinde. É o mais sinistrado, por seleção adversa. Quase ninguém vende novo.</p></div>
+    <div class="driver"><b>Coletivo Empresarial · ~70% das vidas</b><span class="pill up">sem teto</span><p>Negociado. &lt;30 vidas: regra agregada da ANS (RN 309), pool de risco com reajuste único (mini-individual). 30–99: regras intermediárias. &gt;100: liberdade total — onde os reajustes mais pesados acontecem.</p></div>
+    <div class="driver mid"><b>Coletivo por Adesão</b><span class="pill mix">associações</span><p>Vinculado a associações/conselhos (OAB, sindicatos). A ANS regula com mais firmeza que o empresarial, menos que o individual. Perfil de risco próximo ao individual.</p></div>
+  </div>
+  <div class="note"><b>Faixa etária e aniversários (RN 63/2003):</b> dez faixas, variação da 1ª à última ≤ 500%, salto de 30–70% na faixa 59+ (cumulativo ao reajuste anual). À medida que a base envelhece, o ticket médio sobe sozinho — crescimento de receita "automático", mas com custo médico subindo. Cada contrato reajusta no aniversário, então o turnaround leva 12–18 meses para fluir.</div>
+
+  <h3 style="margin-top:22px">A lei-base e o mapa de normas</h3>
+  <p class="lead">Arquitetura em três camadas: Constituição (saúde é direito), CDC (contratos) e Lei 9.656/98 com as RNs da ANS.</p>
+  <div class="tablecard">
+    <table>
+      <thead><tr><th>Artigo (Lei 9.656/98)</th><th>O que trata</th></tr></thead>
+      <tbody>
+        <tr><td><b>Art. 10</b></td><td class="small">Cobertura mínima obrigatória — a âncora do rol.</td></tr>
+        <tr><td><b>Art. 12</b></td><td class="small">Segmentações assistenciais e carências máximas.</td></tr>
+        <tr><td><b>Art. 13</b></td><td class="small">Rescisão de contrato individual; protege o beneficiário.</td></tr>
+        <tr><td><b>Art. 14</b></td><td class="small">Doença preexistente e CPT: cobertura parcial por até 24 meses.</td></tr>
+        <tr><td><b>Art. 30 e 31</b></td><td class="small">Permanência no plano após desligamento ou aposentadoria; cria base de risco maior.</td></tr>
+        <tr><td><b>Art. 35-G</b></td><td class="small">Ressarcimento ao SUS, via TUNEP, quando o beneficiário usa o sistema público.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3 style="margin-top:18px">Mapa de RNs da ANS</h3>
+  <div class="chain" style="gap:6px">
+    <span class="tick">RN 195 · contratação</span>
+    <span class="tick">RN 309 · pool de risco</span>
+    <span class="tick">RN 412 · portabilidade</span>
+    <span class="tick">RN 428 · rol e DUTs</span>
+    <span class="tick">RN 433 · copart. e franquia</span>
+    <span class="tick">RN 465 · rol consolidado</span>
+    <span class="tick">RN 533 · OPME</span>
+    <span class="tick">RN 565 · reajuste individual</span>
+  </div>
+  <h3 style="margin-top:22px">No horizonte regulatório</h3>
+  <div class="horiz">
+    <div class="driver long"><b>Revisão do rol &amp; judicialização</b><span class="pill down">custo ↑</span><p>Cada novo entendimento da Lei 14.454/22 tem custo. Viés altista permanente de sinistralidade.</p></div>
+    <div class="driver"><b>Rescisão unilateral</b><span class="pill mix">regulatório</span><p>Tendência de mais restrições (idosos, beneficiários em tratamento).</p></div>
+    <div class="driver"><b>Planos de acesso (populares)</b><span class="pill up">crescimento</span><p>Cobertura reduzida em discussão; se aprovada, abre canal de crescimento e ataque ao "teto de renda" da cobertura.</p></div>
+  </div>
+
+  <h2>7 · Verticalização — a integração pagador ↔ prestador</h2>
+  <p class="lead">A maior força estrutural do setor. Os dois maiores movimentos da década foram integrações verticais em sentidos opostos: Hapvida + NotreDame (operadora comprando rede própria) e Rede D'Or + SulAmérica (prestador comprando operadora). A lógica é a mesma: internalizar os três vértices do triângulo numa única P&amp;L.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Por que integrar</h3><p>Capturar a margem do elo vizinho; <b>controlar a utilização</b> (quem é dono do hospital decide o que é feito); transformar o incentivo de volume do prestador em <b>capitation interno</b>; e ganhar previsibilidade de custo médico. É a resposta privada à distorção de incentivos do triângulo.</p></div>
+    <div class="card"><h3>Os dois sentidos</h3><p><b>Operadora → prestador (Hapvida):</b> rede própria, ticket baixo, sinistralidade ~5 p.p. menor que seguradoras. <b>Prestador → operadora (RDOR + SULA):</b> garante demanda cativa para os leitos e fecha o ciclo do pagador ao prestador.</p></div>
+    <div class="card"><h3>A economia</h3><p>O paciente da operadora própria atendido no hospital próprio vira <b>eliminação intercompany</b>: o "sinistro" de um lado é "receita" do outro — a margem migra de elo, não desaparece. E o <b>float</b> da operadora financia a <b>NCG</b> do hospital: o consolidado fica menos sensível ao ciclo.</p></div>
+    <div class="card"><h3>Riscos</h3><p>O preço de transferência tem de ser de mercado (risco fiscal/regulatório); conflito de canal (hospital próprio × credenciados e operadoras concorrentes); escrutínio do <b>CADE</b> na consolidação; e a dificuldade real de integrar sistemas, cultura e governança pós-fusão.</p></div>
+  </div>
+  <div class="note"><b>Em uma frase:</b> a verticalização é a tese de RDOR e Hapvida — internalizar pagador e prestador para atacar a distorção de incentivos. O prêmio de quem compra a tese é a captura dessa margem integrada; o risco é que o ciclo (utilização, juros) atinge a estrutura inteira de uma vez.</div>
+
+  <h2>8 · Modelos de remuneração — do fee-for-service ao value-based</h2>
+  <p class="lead">O fee-for-service é a raiz da inflação médica: paga-se por volume, logo o prestador ganha fazendo mais. O setor migra — devagar — para modelos que transferem risco ao prestador. Quanto mais para baixo na lista, mais o risco atuarial sai do pagador e vai para quem atende (e mais o modelo se parece com verticalização sem fusão).</p>
+  <div class="tablecard">
+    <table>
+      <thead><tr><th>Modelo</th><th>Quem carrega o risco</th><th>Incentivo</th><th>No Brasil</th></tr></thead>
+      <tbody>
+        <tr><td><b>Fee-for-service (FFS)</b></td><td class="small">Pagador (operadora)</td><td class="small">Volume — ganha-se por procedimento</td><td class="small">Padrão dominante; raiz do VCMH alto</td></tr>
+        <tr><td><b>Pacote / bundled</b></td><td class="small">Compartilhado</td><td class="small">Eficiência por episódio (ex.: parto, cirurgia)</td><td class="small">Crescente em procedimentos eletivos</td></tr>
+        <tr><td><b>DRG</b> (grupos de diagnóstico)</td><td class="small">Prestador (por caso)</td><td class="small">Eficiência por complexidade do diagnóstico</td><td class="small">Adoção inicial; importado dos EUA</td></tr>
+        <tr><td><b>Capitation</b></td><td class="small">Prestador</td><td class="small">Valor fixo por vida/mês — gerir a saúde, não o volume</td><td class="small">Núcleo do modelo verticalizado</td></tr>
+        <tr><td><b>Value-based (P4P)</b></td><td class="small">Prestador</td><td class="small">Desfecho e qualidade, não volume</td><td class="small">Incipiente; piloto em grandes redes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><b>Por que importa para a tese:</b> a adoção de modelos de risco ainda é baixa e o FFS domina — por isso a inflação médica persiste. Quem domina o custo (verticalizada com capitation interno) tem vantagem estrutural justamente porque escapou do FFS.</div>
+
+  <h2>9 · Os outros elos: diagnóstico &amp; odontológico</h2>
+  <p class="lead">A leitura acima foca hospital e operadora médico-hospitalar. Mas dois elos listados têm economia própria — e entram na tese por caminhos diferentes.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Diagnóstico (FLRY3, DASA3)</h3><p>Medicina diagnóstica — laboratório + imagem. Negócio de <b>volume e escala</b>: ticket baixo por exame, alto giro, capex em equipamento e rede de coleta. Mix <b>B2B</b> (hospitais/operadoras) × <b>B2C</b> (marca premium). Sofre verticalização das operadoras (laboratório próprio) e pressão de preço — mas é alvo natural de consolidação.</p></div>
+    <div class="card"><h3>Odontológico (ODPV3 · QUAL3 em parte)</h3><p>~36 mi vidas e crescendo mais rápido que o médico. <b>Sinistralidade estruturalmente baixa</b> (~40–50%), <b>capital leve</b> (sem leito, sem alto custo), receita previsível → ROE alto e forte geração de caixa. É o "anti-hospital": defensivo e de margem alta. Risco: comoditização e poder da distribuição (bancos/varejo).</p></div>
+  </div>
+  <div class="note"><b>Leitura:</b> diagnóstico é um elo de escala e alvo de verticalização; o dental é o ativo defensivo de margem alta do setor. Tratá-los com a régua do hospital (intensivo em capital e sinistro) leva a conclusões erradas.</div>
+
+  <h2>10 · Capital regulatório &amp; solvência (ANS)</h2>
+  <p class="lead">A operadora não opera com o caixa que aparenta ter. A ANS exige capital e ativos vinculados — e isso, mais do que qualquer narrativa, é o que move a consolidação e limita o quanto o float vira retorno.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Margem de solvência / capital mínimo</h3><p>A ANS exige capital proporcional a prêmios e sinistros (capital base + risco). Operadora subcapitalizada não cresce, não suporta o ciclo de sinistralidade e, no limite, sofre direção fiscal/técnica.</p></div>
+    <div class="card"><h3>Ativos garantidores</h3><p>Parte das provisões técnicas (PEONA/PESL etc.) precisa estar lastreada em <b>ativos específicos</b> — títulos registrados e vinculados na ANS. <b>Não é caixa livre da holding</b>: está preso em garantia regulatória.</p></div>
+    <div class="card"><h3>Motor da consolidação</h3><p>São ~670 operadoras, muitas pequenas e sem capital para atravessar o ciclo. As grandes compram carteira e ganham escala regulatória — a redução contínua do número de operadoras é, em boa parte, uma história de capital.</p></div>
+    <div class="card"><h3>O teto do float</h3><p>Float alto + Selic alta = resultado financeiro turbinado (o motor do lucro recorde de 2025). Mas o capital regulatório é o teto de quanto disso é "livre" — e quando o juro cai, esse resultado encolhe. É o principal risco do modelo pagador.</p></div>
+  </div>
+
+  <h2>11 · Demanda estrutural: demografia &amp; transição epidemiológica</h2>
+  <p class="lead">O lastro de longo prazo da tese não é o ciclo — é a demografia. E ela é, ao mesmo tempo, vento a favor da receita e contra do custo.</p>
+  <div class="grid kpis">
+    <div class="kpi"><div class="v">~10,9% → ~22%</div><div class="l">População 65+ (2022 → 2050)</div><div class="s">Envelhecimento acelerado · IBGE</div></div>
+    <div class="kpi"><div class="v">≤ 500%</div><div class="l">Variação de ticket por faixa etária</div><div class="s">RN 63: ticket sobe sozinho com a idade</div></div>
+    <div class="kpi"><div class="v">crônico &gt; agudo</div><div class="l">Transição epidemiológica</div><div class="s">De infeccioso para crônico/oncológico</div></div>
+    <div class="kpi"><div class="v">aditiva</div><div class="l">Inovação tecnológica</div><div class="s">Soma custo, não substitui o antigo</div></div>
+  </div>
+  <div class="note"><b>Os dois lados:</b> mais idosos = mais ticket e receita "automática", mas também mais sinistro e mais pressão sobre a acessibilidade do plano. E o <b>teto de cobertura</b> (~24% da população, travado desde 2014) é o limite de penetração: romper isso — planos populares, produto acessível — é o crescimento de longo prazo que vai além da demografia.</div>
+
+  <h2>12 · Churn e o vínculo com o emprego formal</h2>
+  <p class="lead">Cerca de 70% das vidas estão em planos coletivos empresariais — então a base do setor segue o emprego formal. Saúde suplementar é, em boa parte, um derivativo do mercado de trabalho.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>O mecanismo</h3><p>Contratação formal (CLT) gera vida; demissão a retira — com janela de permanência (Art. 30/31, ex-empregado e aposentado). O <b>CAGED</b> é, na prática, um indicador antecedente de vidas para as operadoras com base corporativa.</p></div>
+    <div class="card"><h3>Pró-ciclicidade</h3><p>Expansão do emprego → adição de vidas; recessão → perda. A crise de 2015–19 tirou ~3 mi de vidas do sistema. Por isso o setor é <b>pró-cíclico</b> — e a retomada pós-2020 acompanhou o emprego.</p></div>
+    <div class="card"><h3>Churn &amp; elasticidade</h3><p>Carência, portabilidade (RN 412) e o SUS como alternativa moldam a elasticidade-preço. Reajuste pesado em recessão = churn + <b>downgrade</b> de plano (migração para produtos mais baratos), não só perda de vidas.</p></div>
+    <div class="card"><h3>Como modelar net adds</h3><p>Olhe o <b>emprego formal (CAGED)</b>, não só o preço. No coletivo, quem decide é a empresa contratante — a sensibilidade real é a folha do empregador, não o bolso do beneficiário.</p></div>
+  </div>
+
+  <p class="src" style="margin-top:24px;font-size:11px;color:var(--ink-3)">Fonte: <b>Análise de Investimento — Rede D'Or &amp; BradSaúde / Saúde Suplementar · Fundamentos do Setor</b> (Gabriel H. Ferreira, jun/2026), Seção 01 — Re-Cap do Setor de Saúde. Blocos 7–12: síntese setorial complementar.</p>
+</section>
+
+<!-- ================= DRIVERS ================= -->
+<section class="tab" id="drivers">
+  <h2>Drivers do setor por horizonte</h2>
+  <p class="lead">Para modelar os players, os drivers se organizam em três camadas: o ciclo (curto prazo), os movimentos estruturais em curso (médio) e as forças demográficas/tecnológicas (longo). A cor indica o horizonte; a etiqueta, o sinal típico para as companhias listadas.</p>
+
+  <div class="horiz">
+    <div class="dcol">
+      <h3>⏱ Curto prazo (0–2 anos)</h3>
+      <div class="driver"><b>Emprego formal (CAGED)</b><span class="pill up">benef. ↑</span><p>~70% dos beneficiários estão em planos coletivos empresariais. Adição líquida de vagas CLT é o melhor leading indicator de crescimento de vidas.</p></div>
+      <div class="driver"><b>Ciclo reajuste × sinistralidade</b><span class="pill mix">margem</span><p>Operadoras repassam custo com defasagem (~12–18m). 2022 = pico de sinistralidade (89,2%); 2023–25 = recomposição. 2025 fechou com sinistralidade de 81,7% e lucro recorde de R$ 24,4 bi (+121%). Em 2026 os reajustes já desaceleram (9,9% coletivos; 5,11% individuais) — a questão é quanta margem se sustenta com preço cedendo.</p></div>
+      <div class="driver"><b>Taxa de juros (Selic)</b><span class="pill mix">misto</span><p>Juro alto ajuda o resultado financeiro das operadoras (float das provisões) e machuca prestadores alavancados (Rede D'Or, Oncoclínicas, Dasa) e o custo de capital do setor todo.</p></div>
+      <div class="driver"><b>Glosas, prazos e poder de barganha</b><span class="pill down">prestador ↓</span><p>Tensão operadora × prestador: glosas e alongamento de recebíveis transferem capital de giro na cadeia. Monitorar dias de contas a receber dos hospitais.</p></div>
+    </div>
+    <div class="dcol">
+      <h3>📐 Médio prazo (2–7 anos)</h3>
+      <div class="driver mid"><b>Verticalização</b><span class="pill mix">disruptivo</span><p>Modelo Hapvida (operadora + rede própria, ticket baixo) pressiona o modelo tradicional de reembolso. Define quem captura a margem da cadeia.</p></div>
+      <div class="driver mid"><b>Consolidação / M&amp;A</b><span class="pill up">escala ↑</span><p>Hapvida+GNDI, Rede D'Or+SulAmérica, Fleury+Pardini, JV Dasa+Amil. Setor ainda fragmentado (~670 operadoras; milhares de hospitais) → pipeline longo de consolidação.</p></div>
+      <div class="driver mid"><b>Revisão regulatória (Lei 9.656)</b><span class="pill mix">incerteza</span><p>Em debate no Congresso/ANS: reajuste de coletivos pequenos, planos acessíveis/segmentados, franquia e coparticipação. Pode reabrir o mercado individual — hoje travado.</p></div>
+      <div class="driver mid"><b>Judicialização &amp; rol</b><span class="pill down">custo ↑</span><p>Rol exemplificativo (Lei 14.454/22) + judicialização de terapias de alto custo = cauda de custos difícil de precificar para operadoras.</p></div>
+      <div class="driver mid"><b>Digital, dados e eficiência</b><span class="pill up">margem ↑</span><p>Telemedicina regulamentada (pós-2020), prontuário e interoperabilidade (RNDS), IA em diagnóstico — alavanca de produtividade sobretudo para diagnósticos e verticalizadas.</p></div>
+    </div>
+    <div class="dcol">
+      <h3>🧭 Longo prazo (7+ anos)</h3>
+      <div class="driver long"><b>Envelhecimento populacional</b><span class="pill up">demanda ↑</span><p>65+ vai de ~11% (2022) para ~22% (2050). Idoso custa 4–6× um jovem adulto em sinistro. Demanda estrutural crescente — e pressão atuarial sobre o pool.</p></div>
+      <div class="driver long"><b>Transição epidemiológica</b><span class="pill up">oncologia ↑</span><p>Doenças crônicas (câncer, cardio, diabetes, saúde mental) dominam a carga. Sustenta teses de oncologia (ONCO3), diagnóstico preventivo e farma de marca.</p></div>
+      <div class="driver long"><b>Inflação médica estrutural</b><span class="pill down">custo ↑</span><p>VCMH historicamente roda IPCA + 5–8 p.p. (tecnologia, utilização, fee-for-service). Sem mudança de modelo de remuneração, comprime acessibilidade dos planos.</p></div>
+      <div class="driver long"><b>Renda e teto de penetração</b><span class="pill mix">limite</span><p>Penetração de planos estagnada em 24–27% há uma década — limitada por renda, não por desejo. Crescimento de vidas de longo prazo depende de produto mais barato (regional, verticalizado, segmentado).</p></div>
+      <div class="driver long"><b>Incorporação tecnológica</b><span class="pill down">custo ↑</span><p>Terapias gênicas/celulares e biológicos de alto custo entram via CONITEC (SUS) e rol/judicialização (suplementar). Risco de cauda relevante para pagadoras.</p></div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:38px">Os drivers em gráficos</h2>
+  <div class="grid cards2">
+    <div class="card">
+      <h3>Reajustes de planos de saúde × IPCA — série completa 2000–2026 (%)</h3>
+      <div class="chartbox"><canvas id="chReajuste"></canvas></div>
+      <div class="src">Fonte: ANS (teto individual: série oficial completa desde 2000; coletivos: divulgação a partir de 2023), IBGE. Em 27 anos, o teto ANS só ficou abaixo do IPCA em 5 (2002–03, 2017 e o atípico 2021) — inflação médica supera a geral como regra. 2026: 5,11%, o menor da história ex-2021. Coletivos = 84% dos vínculos.</div>
+    </div>
+    <div class="card">
+      <h3>Sinistralidade média do setor — % do prêmio</h3>
+      <div class="chartbox"><canvas id="chSinistro"></canvas></div>
+      <div class="src">Fonte: releases anuais da ANS (2020–25 oficiais; 2018–19 aprox.). O ciclo completo: mínima histórica de 76% em 2020 (represamento da pandemia), pico de 89,2% em 2022 (rebote + inflação médica), e recomposição até 81,7% em 2025 — com lucro recorde de R$ 24,4 bi. Linha tracejada: zona "saudável" de referência (~82%).</div>
+    </div>
+    <div class="card">
+      <h3>População 65+ — % do total, 1980–2060 (Censos + projeção IBGE)</h3>
+      <div class="chartbox"><canvas id="chDemo"></canvas></div>
+      <div class="src">Fonte: IBGE (Censos 1980–2022, linha cheia; projeções rev. 2024 em tracejado, aprox.). Levamos 42 anos para ir de 4% a 11% — e levaremos ~28 para ir de 11% a 22%. O driver mais previsível do setor, e o mais poderoso.</div>
+    </div>
+    <div class="card">
+      <h3>Inflação médica (VCMH/IESS) × IPCA — 2007–2023 (%)</h3>
+      <div class="chartbox"><canvas id="chVcmh"></canvas></div>
+      <div class="src">Fonte: IESS (VCMH 12 meses, posição de dez; 2023 = set, última divulgação pública gratuita), IBGE. Média 2007–19: ~14% a.a. ≈ IPCA + 8 p.p. O -1,9% de 2020 e o +25% de 2021 expõem o componente de frequência de uso — o VCMH mede preço × utilização.</div>
+    </div>
+    <div class="card">
+      <h3>Leitura conjunta para o modelo</h3>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:8px">Em síntese, o circuito que move os P&amp;Ls do setor:</p>
+      <ol style="font-size:13.5px;color:var(--ink-2);padding-left:20px;margin-top:8px;display:grid;gap:8px">
+        <li><b>Vidas</b> = f(emprego formal, preço do produto) → receita das operadoras e volume dos prestadores.</li>
+        <li><b>Custo médico</b> = f(utilização, inflação médica, envelhecimento, rol/judicialização) → sinistralidade.</li>
+        <li><b>Reajuste</b> responde à sinistralidade com defasagem → restaura margem, mas testa elasticidade-preço das vidas.</li>
+        <li><b>Juros</b> definem quem ganha no meio do ciclo: pagadoras (float) vs prestadores alavancados (dívida).</li>
+        <li><b>Consolidação/verticalização</b> redistribui a margem da cadeia ao longo do tempo.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HORIZONTE DOS DRIVERS ================= -->
+<section class="tab" id="horizonte">
+  <h2>Mapa de horizonte — quando cada driver bate no P&amp;L</h2>
+  <p class="lead">Cada barra é a janela em que o driver é decisivo para resultados e teses. Verde = ciclo (entra e sai do preço rápido); azul = estrutural (redistribui a margem da cadeia ao longo de anos); âmbar = secular (define TAM e custo de longo prazo — não é "se", é "quanto").</p>
+
+  <div class="card">
+    <h3>Janela de atuação de cada driver (2026 → 2045)</h3>
+    <div class="chartbox" style="height:480px"><canvas id="chGantt"></canvas></div>
+    <div class="hleg"><span class="l1">Cíclicos</span><span class="l2">Estruturais</span><span class="l3">Seculares</span></div>
+    <div class="src">Janelas qualitativas definidas neste estudo (editáveis no bloco DATA). Barras mais à direita sem fim visível continuam além de 2045. Passe o mouse para ver o racional de cada janela.</div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:16px">
+    <div class="card">
+      <h3>Matriz: impacto × prazo × previsibilidade</h3>
+      <div class="chartbox" style="height:360px"><canvas id="chMatriz"></canvas></div>
+      <div class="src">Eixo x: ano em que o efeito atinge o pico. Eixo y: impacto potencial no P&amp;L consolidado do setor (1–5). Tamanho da bolha: previsibilidade — bolha grande = driver "modelável" (ex.: demografia); bolha pequena = binário/incerto (ex.: revisão regulatória). Cores seguem o horizonte.</div>
+    </div>
+    <div class="card">
+      <h3>Como usar este mapa no modelo</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Bolhas grandes e altas</b> (envelhecimento, inflação médica) entram como <b>premissa central</b> do modelo — errar aqui compromete qualquer valuation.</li>
+        <li><b>Bolhas pequenas e altas</b> (revisão da Lei 9.656) não entram na média: viram <b>árvore de cenários</b> com probabilidade explícita.</li>
+        <li><b>Cíclicos</b> calibram o ano 1–2 da projeção (e explicam o múltiplo de hoje); <b>estruturais</b> definem market share e margem no ano 3–7; <b>seculares</b> definem perpetuidade.</li>
+        <li>A sequência prática: comece o modelo pelos seculares (TAM/custo), sobreponha os estruturais (quem captura), e por último o ciclo (ponto de partida).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 style="margin-top:38px">Deep-dive — drivers cíclicos (0–2 anos)</h2>
+  <div class="horiz">
+    <div class="dcol">
+      <div class="driver"><b>D1 · Emprego formal (CAGED)</b><span class="pill mix">misto</span>
+        <p>~84% dos vínculos são coletivos: cada vaga CLT criada é um candidato a vida nova. Elasticidade histórica: mercado de vidas cresce ~0,5–0,7× o ritmo do emprego formal.</p>
+        <div class="chartbox" style="height:160px"><canvas id="chCaged"></canvas></div>
+        <div class="dmeta"><span><b>Transmissão:</b> volume de vidas → receita de HAPV3/SAUD3/seguradoras</span><span><b>Monitorar:</b> saldo CAGED mensal (MTE) + adesões ANS trimestral</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 +</span><span class="tick">SAUD3 +</span><span class="tick">QUAL3 +</span><span class="tick gray">RDOR3 indireto</span></div>
+        <div class="ibar"><i style="width:80%;background:var(--accent)"></i></div></div>
+      <div class="driver"><b>D2 · Ciclo reajuste × sinistralidade</b><span class="pill mix">margem</span>
+        <p>O coração do P&amp;L das pagadoras. Custo sobe → reajuste responde com 12–18m de defasagem → margem oscila em ciclos de 3–4 anos. Estamos no topo (81,7% em 2025) com preço desacelerando (9,9% coletivos em 2026): o ano de 2027 testa se o platô segura.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> sinistralidade → EBITDA de operadoras; reajuste → churn de vidas</span><span><b>Monitorar:</b> DIOPS trimestral ANS; prévias de reajuste; VCMH</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 ±</span><span class="tick">RDOR3 (SulAmérica) ±</span><span class="tick gray">prestadores: efeito espelho</span></div>
+        <div class="ibar"><i style="width:100%;background:var(--accent)"></i></div></div>
+      <div class="driver"><b>D3 · Juros (Selic)</b><span class="pill mix">misto</span>
+        <p>Dois canais opostos: operadoras carregam provisões aplicadas (R$ 14,7 bi de resultado financeiro em 2025 — 60% do lucro do setor!) e ganham com juro alto; prestadores alavancados (DASA3, ONCO3, RDOR3) pagam a conta. Queda da Selic inverte o jogo: comprime lucro de pagadora e destrava valuation de prestador.</p>
+        <div class="chartbox" style="height:160px"><canvas id="chSelic"></canvas></div>
+        <div class="dmeta"><span><b>Transmissão:</b> resultado financeiro (pagadoras) / despesa financeira e WACC (prestadores)</span><span><b>Monitorar:</b> Copom, curva DI, dívida líquida/EBITDA das cias</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">RDOR3 −juro</span><span class="tick">ONCO3 −juro</span><span class="tick">DASA3 −juro</span><span class="tick">VVEO3 −juro</span></div>
+        <div class="ibar"><i style="width:80%;background:var(--accent)"></i></div></div>
+      <div class="driver"><b>D4 · Pêndulo glosas &amp; prazos</b><span class="pill down">prestador −</span>
+        <p>Glosa inicial em recorde (8,6% mercado; 11,9% Anahp) e recebíveis alongados: as operadoras estão exportando capital de giro para os prestadores. Tende a afrouxar quando a margem das pagadoras normalizar — mas com defasagem.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> dias de contas a receber e PDD dos hospitais → conversão de caixa</span><span><b>Monitorar:</b> DSO trimestral de RDOR3/ONCO3/MATD3/DASA3; balanço Anahp</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">ONCO3 −</span><span class="tick">MATD3 −</span><span class="tick">RDOR3 − (e + via SulAmérica)</span></div>
+        <div class="ibar"><i style="width:60%;background:var(--accent)"></i></div></div>
+      <div class="driver"><b>D5 · Câmbio (insumos importados)</b><span class="pill down">custo −</span>
+        <p>OPME, medicamentos de alto custo e princípios ativos (IFA) são dolarizados. Depreciação cambial pressiona custo de hospitais e o COGS da farma (BLAU3 e HYPE3 importam IFA), com repasse limitado pela CMED.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> COGS de farma e hospitais; margem bruta</span><span><b>Monitorar:</b> BRL/USD; mix importado citado nos releases das cias</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">BLAU3 −</span><span class="tick">HYPE3 −</span><span class="tick gray">hospitais −</span></div>
+        <div class="ibar"><i style="width:40%;background:var(--accent)"></i></div></div>
+    </div>
+
+    <div class="dcol">
+      <h2 style="font-size:21px;margin:0 0 12px">Estruturais (2–7 anos)</h2>
+      <div class="driver mid"><b>D6 · Verticalização</b><span class="pill mix">disruptivo</span>
+        <p>A tese de 25 anos que ainda tem estrada: medicina de grupo saiu de 38% para 40% do mercado e opera com sinistralidade ~5 p.p. menor (77,2% vs 82,3% das seguradoras). Cada ponto de share que migra para o modelo verticalizado redesenha o pool de margem da cadeia inteira — e espreme o prestador independente.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> share de vidas por modalidade; sinistralidade relativa</span><span><b>Monitorar:</b> TABNET modalidades (nossa série anual); capex de rede própria</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 +</span><span class="tick">RDOR3 ± (integrou por cima)</span><span class="tick">FLRY3/DASA3 − (perdem fluxo)</span></div>
+        <div class="ibar"><i style="width:100%;background:var(--blue)"></i></div></div>
+      <div class="driver mid"><b>D7 · Consolidação / M&amp;A</b><span class="pill up">escala +</span>
+        <p>Saem ~12 operadoras/ano (790→667 em dez anos) e o parque de 6,4 mil hospitais tem escala média de 78 leitos: o funil de aquisições é estruturalmente longo. Juro alto seleciona os consolidadores — quem tem caixa/ações fortes compra barato no fundo do ciclo.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> crescimento inorgânico, sinergias, poder de barganha regional</span><span><b>Monitorar:</b> regimes especiais ANS; pipeline declarado nos calls; CADE</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">RDOR3 +</span><span class="tick">HAPV3 +</span><span class="tick">ONCO3 ±</span><span class="tick gray">alvos: regionais</span></div>
+        <div class="ibar"><i style="width:80%;background:var(--blue)"></i></div></div>
+      <div class="driver mid"><b>D8 · Revisão regulatória (Lei 9.656)</b><span class="pill mix">binário</span>
+        <p>O evento mais assimétrico do mapa. Cauda positiva: regras viáveis para planos individuais/segmentados reabrem um mercado de dezenas de milhões de vidas (cobertura travada em 22–24% há uma década). Cauda negativa: tabelamento de reajuste de coletivos pequenos comprime o núcleo do lucro. Não entra na média do modelo: é cenário com probabilidade.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> TAM de vidas; liberdade de pricing</span><span><b>Monitorar:</b> tramitação no Congresso; agenda regulatória ANS; consultas públicas</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 ±±</span><span class="tick">QUAL3 ±±</span><span class="tick">SAUD3 +</span></div>
+        <div class="ibar"><i style="width:100%;background:var(--blue)"></i></div></div>
+      <div class="driver mid"><b>D9 · Judicialização &amp; rol</b><span class="pill down">custo −</span>
+        <p>Rol exemplificativo (Lei 14.454/22) + ativismo judicial = cauda de custos não-precificável. Estimativas setoriais apontam bilhões/ano em despesas judicializadas. Pressão permanente de ~0,5–1 p.p. na sinistralidade até que jurisprudência ou nova regulação estabilize.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> sinistralidade + provisões judiciais (PEONA/cíveis)</span><span><b>Monitorar:</b> decisões STJ/STF; despesas judiciais nos DIOPS; NIPs ANS</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 −</span><span class="tick">RDOR3 (SulAmérica) −</span><span class="tick gray">prestadores neutro/+</span></div>
+        <div class="ibar"><i style="width:70%;background:var(--blue)"></i></div></div>
+      <div class="driver mid"><b>D10 · Digital, dados &amp; IA</b><span class="pill up">eficiência +</span>
+        <p>Telemedicina consolidada, prontuário interoperável (RNDS) e IA em diagnóstico/autorização. O prêmio vai para quem tem dado proprietário em escala: verticalizadas (jornada completa do paciente) e diagnósticos (banco de exames para treinar IA). Reduz custo unitário — mas também comoditiza o exame simples.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> custo por atendimento; G&amp;A; ticket de exames</span><span><b>Monitorar:</b> métricas digitais nos releases; parcerias de IA; regulação CFM/ANS</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 +</span><span class="tick">FLRY3 ±</span><span class="tick">DASA3 ±</span><span class="tick">RADL3 + (mídia/varejo)</span></div>
+        <div class="ibar"><i style="width:60%;background:var(--blue)"></i></div></div>
+      <div class="driver mid"><b>D11 · Modelos de remuneração</b><span class="pill mix">transição</span>
+        <p>O fee-for-service premia volume e alimenta a inflação médica; 69% dos hospitais já testam modelos alternativos (bundle, capitation, DRG), mas só 14,5% têm &gt;50% da receita neles. A transição é lenta e redistribui risco: prestador que sabe gerir desfecho ganha; o que vive de diária/OPME perde.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> ticket médio hospitalar; previsibilidade de margem</span><span><b>Monitorar:</b> % receita em modelos alternativos (Anahp); pilotos das grandes operadoras</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">MATD3 ±</span><span class="tick">RDOR3 ±</span><span class="tick">ONCO3 + (bundle onco)</span></div>
+        <div class="ibar"><i style="width:60%;background:var(--blue)"></i></div></div>
+    </div>
+
+    <div class="dcol">
+      <h2 style="font-size:21px;margin:0 0 12px">Seculares (7+ anos)</h2>
+      <div class="driver long"><b>D12 · Envelhecimento populacional</b><span class="pill up">demanda ++</span>
+        <p>O driver mais poderoso e mais previsível: 65+ dobra de ~11% para ~22% até 2050 (nossa série 1980–2060). Idoso usa 4–6× mais saúde. Demanda estrutural para hospitais, oncologia, diagnóstico e farmácia — e pressão atuarial brutal sobre o pool de planos (mensalidade do jovem subsidia o idoso; pirâmide invertendo).</p>
+        <div class="dmeta"><span><b>Transmissão:</b> volume/mix de TODOS os elos; sinistralidade por faixa etária</span><span><b>Monitorar:</b> projeções IBGE; pirâmide etária das carteiras (TABNET faixa etária)</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">RDOR3 +</span><span class="tick">ONCO3 +</span><span class="tick">RADL3 +</span><span class="tick">FLRY3 +</span><span class="tick">pagadoras −custo</span></div>
+        <div class="ibar"><i style="width:100%;background:var(--amber)"></i></div></div>
+      <div class="driver long"><b>D13 · Transição epidemiológica</b><span class="pill up">onco/crônicos +</span>
+        <p>Câncer já é a 2ª causa de internação privada (10,0% das saídas — Anahp). DCNT (cardio, diabetes, obesidade, saúde mental) dominam a carga de doença. Sustenta o crescimento secular de oncologia, infusão, diagnóstico preventivo e farma de especialidades — e muda o hospital de "agudo" para "crônico gerenciado".</p>
+        <div class="dmeta"><span><b>Transmissão:</b> mix de procedimentos (ticket alto recorrente)</span><span><b>Monitorar:</b> INCA (incidência), SIH/Anahp (perfil de internações)</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">ONCO3 ++</span><span class="tick">RDOR3 +</span><span class="tick">BLAU3 +</span><span class="tick">HYPE3 +</span></div>
+        <div class="ibar"><i style="width:80%;background:var(--amber)"></i></div></div>
+      <div class="driver long"><b>D14 · Inflação médica estrutural</b><span class="pill down">custo −−</span>
+        <p>VCMH médio de ~14% a.a. por 17 anos (≈ IPCA +8 p.p.) — tecnologia nova é aditiva (não substitui a velha), utilização cresce e o fee-for-service amplifica. Terapias gênicas/celulares de R$ 1–5 mi por paciente entram pela porta do rol/judicialização. É o limite de longo prazo da acessibilidade do plano — e o melhor argumento estrutural da verticalização.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> sinistralidade; necessidade de reajuste acima da renda</span><span><b>Monitorar:</b> VCMH/IESS; incorporações CONITEC/rol; pipeline de alto custo</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">pagadoras −</span><span class="tick">HAPV3 (defesa via custo)</span><span class="tick">BLAU3/HYPE3 ±</span></div>
+        <div class="ibar"><i style="width:100%;background:var(--amber)"></i></div></div>
+      <div class="driver long"><b>D15 · Teto de renda / penetração</b><span class="pill mix">limite</span>
+        <p>Cobertura travada em 22–24% desde 2014 (nossa série): o produto atual não cabe no bolso de 75% do país. O crescimento secular de vidas depende de produto novo (regional, verticalizado, segmentado, odonto como porta de entrada) ou de renda — e o odonto prova que há demanda: 13× em 25 anos com ticket de R$ 20–30.</p>
+        <div class="dmeta"><span><b>Transmissão:</b> TAM de vidas; mix de ticket</span><span><b>Monitorar:</b> taxa de cobertura (nossa série TABNET); renda/massa salarial (IBGE)</span></div>
+        <div class="tk" style="margin-top:8px"><span class="tick">HAPV3 + (dono do low-cost)</span><span class="tick">SAUD3 + (odonto como porta de entrada)</span></div>
+        <div class="ibar"><i style="width:80%;background:var(--amber)"></i></div></div>
+      <div class="note" style="margin-top:14px"><b>Síntese:</b> os seculares garantem que a demanda cresce acima do PIB por décadas; os estruturais decidem <i>quem</i> captura esse crescimento (verticalizadas e consolidadores); o ciclo decide <i>quanto você paga hoje</i> pelo bilhete. O risco que atravessa tudo: regulação (D8/D9).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HISTÓRIA & REGULAÇÃO ================= -->
+<section class="tab" id="historia">
+  <h2>Linha do tempo — marcos que moldaram o setor</h2>
+  <p class="lead">A regulação é o fator de risco nº 1 do setor. Quase todos os pontos de inflexão das teses listadas vieram de lei, agência ou judiciário — não de tecnologia ou demanda.</p>
+
+  <div class="timeline">
+    <div class="tl"><span class="yr">1988</span><b>Constituição Federal — criação do SUS</b><p>Saúde como direito universal e dever do Estado. Define o caráter dual do sistema: público universal + privado complementar/suplementar.</p></div>
+    <div class="tl"><span class="yr">1990</span><b>Leis 8.080 e 8.142 — organização do SUS</b><p>Estruturam financiamento tripartite (União, estados, municípios) e participação social. Base do SIOPS e da descentralização.</p></div>
+    <div class="tl"><span class="yr">1998</span><b>Lei 9.656 — marco regulatório dos planos de saúde</b><p>Cobertura mínima obrigatória, proibição de seleção de risco e de rescisão unilateral em individuais. Até hoje é a espinha dorsal da saúde suplementar — e está em discussão de revisão.</p></div>
+    <div class="tl"><span class="yr">1999–2000</span><b>Criação da ANVISA (Lei 9.782) e da ANS (Lei 9.961); Lei dos Genéricos (9.787)</b><p>Nasce o arcabouço de agências. A ANS passa a controlar reajuste de planos individuais, rol de procedimentos e solvência das operadoras. Genéricos redesenham a farma nacional (origem da Hypera, EMS, etc.).</p></div>
+    <div class="tl"><span class="yr">2003</span><b>CMED — teto de preços de medicamentos</b><p>Câmara de Regulação do Mercado de Medicamentos define preço-teto e reajuste anual da indústria farmacêutica.</p></div>
+    <div class="tl"><span class="yr">2011</span><b>Lei 12.401 — CONITEC</b><p>Formaliza a porta de incorporação de tecnologias no SUS, com avaliação de custo-efetividade.</p></div>
+    <div class="tl"><span class="yr">2015</span><b>Lei 13.097 — capital estrangeiro em hospitais</b><p>Abre assistência hospitalar ao capital estrangeiro. Gatilho da onda de private equity, M&amp;A e, depois, IPOs do setor.</p></div>
+    <div class="tl"><span class="yr">2018–2021</span><b>Janela de IPOs de saúde na B3</b><p>Hapvida e NotreDame (2018), Rede D'Or (2020 — maior IPO do ano), Mater Dei, Oncoclínicas, Viveo, Kora, Blau (2021). O setor vira um dos maiores da bolsa.</p></div>
+    <div class="tl"><span class="yr">2020–2021</span><b>Pandemia — choque de utilização</b><p>2020: procedimentos eletivos represados → sinistralidade mínima histórica e reajuste <b>negativo</b> (-8,19% em 2021). Telemedicina autorizada e depois regulamentada em definitivo. 2021–22: rebote violento de utilização.</p></div>
+    <div class="tl"><span class="yr">2022</span><b>Ano-pivô: fusões gigantes, rol e piso da enfermagem</b><p>Consumam-se Hapvida+GNDI e Rede D'Or+SulAmérica (verticalização pelos dois lados). STJ declara rol taxativo (jun) e o Congresso reverte com a Lei 14.454 (rol exemplificativo). Lei 14.434 cria o piso da enfermagem (choque de custo para hospitais e Santas Casas). Sinistralidade bate recorde da série (89,2%) e o segmento médico-hospitalar fecha o ano no prejuízo.</p></div>
+    <div class="tl"><span class="yr">2023–2024</span><b>Recomposição e reorganização do capital</b><p>Reajustes recordes em coletivos recompõem margens das operadoras. Fleury+Pardini consolidam diagnóstico. UnitedHealth deixa o Brasil (venda da Amil); Dasa e Amil formam JV hospitalar (Ímpar). Empresas alavancadas (Dasa, Viveo, Kora) entram em reestruturação/revisão societária.</p></div>
+    <div class="tl"><span class="yr">2025–2026</span><b>Topo de ciclo das pagadoras e desaceleração de preços</b><p>2025 fecha com recordes: 53 mi de beneficiários, sinistralidade de 81,7% (menor desde 2020) e lucro líquido de R$ 24,4 bi (+121%, maior da série). Em 2026 o ciclo de preços vira: teto individual de 5,11% (menor da história ex-2021) e coletivos desacelerando a 9,9%. Em paralelo: revisão da Lei 9.656 em debate no Congresso, regras prudenciais mais duras na ANS, desalavancagem e M&amp;A seletivo nas listadas. <b>Mai/2026: nasce a Bradsaúde (SAUD3)</b> — a Odontoprev incorpora os ativos de saúde do Bradesco (Bradesco Saúde, Mediservice, Atlântica, Orizon, participação na Fleury) e vira o 2º maior grupo listado do setor (~R$ 52 bi), com follow-on à vista para elevar o free float de &lt;10% a 20%.</p></div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:24px">
+    <div class="card">
+      <h3>O que a regulação define, na prática</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:7px;margin-top:6px">
+        <li><b>Preço:</b> reajuste de planos individuais é teto da ANS; coletivos são livres (por ora). Medicamentos têm teto CMED.</li>
+        <li><b>Produto:</b> rol de procedimentos define cobertura mínima; segmentação de produto depende de norma ANS.</li>
+        <li><b>Capital:</b> regras de solvência/capital regulatório das operadoras (margem de solvência → modelo de capital baseado em risco).</li>
+        <li><b>Entrada/saída:</b> registro de operadora, portabilidade de carências, regimes especiais (direção fiscal/liquidação).</li>
+        <li><b>Custo:</b> pisos salariais (enfermagem), incorporações obrigatórias, judicialização.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Implicações para premissas</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:7px;margin-top:6px">
+        <li>Mercado <b>individual</b> só volta a crescer se a revisão regulatória mudar a regra de reajuste — premissa binária, tratar como cenário.</li>
+        <li><b>Rol exemplificativo</b> + judicialização = viés altista permanente de sinistralidade (~0,5–1 p.p./ano de pressão).</li>
+        <li>Risco regulatório de <b>tabelamento de coletivos</b>: baixa probabilidade, impacto severo nas operadoras — monitorar Congresso.</li>
+        <li>CMED limita pricing da farma → crescimento de HYPE3/BLAU3 vem de volume, mix e lançamentos, não de preço real.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPETIÇÃO ================= -->
+<section class="tab" id="competicao">
+  <h2>Quem é quem na saúde suplementar</h2>
+  <p class="lead">O mercado de 53 milhões de vidas tem três blocos competitivos: as <b>verticalizadas de ticket baixo</b> (Hapvida à frente), as <b>seguradoras premium</b> no corporativo high-end (Bradesco, SulAmérica, Porto) e o <b>sistema Unimed</b>, dominante no interior mas fragmentado em ~340 cooperativas independentes. A cauda é longa: 669 operadoras ativas.</p>
+
+  <div class="grid kpis">
+    <div class="kpi"><div class="v">8,6 mi</div><div class="l">Grupo Hapvida (Hapvida + NotreDame) — líder</div><div class="s">16,3% do mercado · mar/2026 · ANS</div></div>
+    <div class="kpi"><div class="v">~20,9 mi</div><div class="l">Sistema Unimed (agregado, saúde + odonto)</div><div class="s">~340 cooperativas independentes · ~37% do mercado</div></div>
+    <div class="kpi"><div class="v">41,8%</div><div class="l">Share dos 9 maiores registros (22,1 mi de vidas)</div><div class="s">mar/2026 · ANS</div></div>
+    <div class="kpi"><div class="v">669</div><div class="l">Operadoras méd.-hospitalares com beneficiários</div><div class="s">fim de 2025 — cauda longa de pequenas e médias</div></div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:18px">
+    <div class="card">
+      <h3>Maiores operadoras — beneficiários méd.-hosp. (mi, mar/2026)</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chShare"></canvas></div>
+      <div class="src">Fonte: ANS (por registro de operadora). Barras azuis = grupo Hapvida (dois registros: Hapvida e NotreDame Intermédica). SulAmérica pertence à Rede D'Or. O sistema Unimed não aparece consolidado por ser composto por centenas de operadoras independentes.</div>
+    </div>
+    <div class="card">
+      <h3>Evolução por modalidade — vidas méd.-hosp. (mi, série oficial)</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chModal"></canvas></div>
+      <div class="src">Fonte: ANS/TABNET (extração própria, série anual completa, dez de cada ano). Medicina de grupo: 11,9 → 21,4 mi em 25 anos (40% do mercado) — cresceu em praticamente todos os anos. Cooperativas: pico em 2014 (19,3 mi), nunca mais recuperado. Autogestão encolhe desde 2010. Seguradoras: 7 empresas com ~1 mi de vidas cada.</div>
+    </div>
+    <div class="card">
+      <h3>Operadoras com beneficiários — a consolidação em curso (2016–2026)</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chOperadoras"></canvas></div>
+      <div class="src">Fonte: ANS (Dados Gerais; dez de cada ano, 2026 = abr). Saem ~12 operadoras médico-hospitalares por ano (-16% em dez anos; odonto: -27%) — via M&amp;A, cessão de carteira e regimes especiais/liquidação. É o funil que alimenta o crescimento inorgânico das líderes, e a queda é contínua desde os anos 2000.</div>
+    </div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:18px">
+    <div class="card">
+      <h3>Quem está ganhando as vidas novas</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li>O mercado adicionou <b>+1,24 mi de vidas em 12 meses</b> (mar/26, +3,6%) — praticamente todas em planos coletivos empresariais.</li>
+        <li><b>Amil em recuperação:</b> maior crescimento recente entre as grandes (+101 mil vidas), reconstruindo a carteira sob o novo dono (pós-saída da UnitedHealth).</li>
+        <li><b>SulAmérica (Rede D'Or)</b> com o segundo maior ganho (+63 mil), validando a tese da integração prestador-pagador.</li>
+        <li><b>Estruturalmente</b>, a modalidade medicina de grupo (verticalizadas) ganha share há 25 anos — o produto de ticket baixo é o único que cabe no bolso do empregador médio.</li>
+        <li>No <b>premium corporativo</b>, Bradesco, SulAmérica e Porto disputam via qualidade: as três têm IDSS (índice de desempenho ANS) acima de 0,85.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Leitura competitiva para as teses listadas</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>HAPV3:</b> liderança absoluta com vantagem de custo estrutural (sinistralidade de medicina de grupo ~77% vs ~82% das seguradoras). Risco: concorrência regional de verticalizadas menores (Athena, Hospital Care) replicando o modelo.</li>
+        <li><b>RDOR3:</b> SulAmérica é o braço de crescimento em vidas; hospitais capturam o sinistro do premium. A Amil revitalizada é o concorrente direto nos dois andares.</li>
+        <li><b>Unimed fragmentada = oportunidade:</b> cooperativas em dificuldade (regimes especiais ANS) alimentam pipeline de consolidação e cessão de carteiras.</li>
+        <li><b>SAUD3 (Bradsaúde):</b> o novo 2º gigante listado (mai/26) — seguradora líder no premium (Bradesco Saúde, 4,1 mi vidas, IDSS &gt;0,85) + líder absoluta do odonto via Odontoprev (9,4 mi vidas num mercado de 35,8 mi que cresce mais rápido que o médico) + hospitais (Atlântica, JV c/ Rede D'Or). Tese: cross-sell e dados; risco: free float &lt;10% até o follow-on.</li>
+        <li><b>QUAL3:</b> espremida — o coletivo por adesão perde espaço para o empresarial (inclusive CNPJ/MEI), canal onde as verticalizadas vendem direto.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CADEIA HOSPITALAR ================= -->
+<section class="tab" id="hospitais">
+  <h2>O parque hospitalar brasileiro</h2>
+  <p class="lead">Um setor grande, fragmentado e de baixa escala média: 6,4 mil hospitais com 78 leitos em média. A consolidação privada (Rede D'Or à frente) ainda arranhou só a superfície — e a tensão econômica entre operadoras e prestadores (glosas, prazos) está no recorde histórico.</p>
+
+  <div class="grid kpis">
+    <div class="kpi"><div class="v">6.399</div><div class="l">Hospitais no Brasil (2024)</div><div class="s">Maioria de pequeno/médio porte · CNES/FBH</div></div>
+    <div class="kpi"><div class="v">459 mil</div><div class="l">Leitos de internação (dez/2025)</div><div class="s">CNES · 69% disponíveis ao SUS</div></div>
+    <div class="kpi"><div class="v">~2,2</div><div class="l">Leitos por 1.000 habitantes</div><div class="s">vs ~4,3 na média OCDE — capacidade restrita · CNES/IBGE</div></div>
+    <div class="kpi"><div class="v">13.555</div><div class="l">Leitos da Rede D'Or (1T26) — maior rede privada</div><div class="s">≈ 3,0% dos leitos do país · RI</div></div>
+    <div class="kpi"><div class="v">8,6%</div><div class="l">Glosa inicial média (2025) — recorde histórico</div><div class="s">11,9% nos hospitais afiliados Anahp</div></div>
+    <div class="kpi"><div class="v">69,4%</div><div class="l">Hospitais já usando remuneração alternativa</div><div class="s">Mas só 14,5% têm &gt;50% da receita fora do fee-for-service</div></div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:18px">
+    <div class="card">
+      <h3>Leitos de internação — série oficial 2005–2026 (mil)</h3>
+      <div class="chartbox"><canvas id="chLeitos"></canvas></div>
+      <div class="src">Fonte: CNES/DATASUS (extração própria, dez de cada ano; 2026 = abr). O país perdeu 35 mil leitos entre 2005 e 2019 — todos do SUS (-60 mil), enquanto o leito privado cresceu sem parar (+31 mil no período total). A pandemia recompôs parte da base.</div>
+    </div>
+    <div class="card">
+      <h3>O que a série de leitos revela</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Encolhimento secular do SUS:</b> de 355 mil leitos (2005) para 295 mil (2019) — fechamento de pequenos hospitais e Santas Casas. A pandemia forçou reabertura (313 mil em 2020), e o patamar se manteve (~316 mil).</li>
+        <li><b>O privado nunca parou de crescer:</b> leitos não-SUS foram de ~111 mil (2005) para ~142 mil (2025), +28% — é onde RDOR3, MATD3 e redes verticalizadas operam.</li>
+        <li><b>Capacidade por habitante caiu:</b> de ~2,5 para ~2,2 leitos/1.000 hab em 20 anos, com população crescendo e envelhecendo — escassez estrutural que sustenta ocupação e pricing dos players privados bem localizados.</li>
+        <li><b>Implicação:</b> a expansão de leitos premium (guidance RDOR3 de +2.690 até 2028) acontece num mercado onde o ativo é estruturalmente escasso.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:18px">
+    <div class="card">
+      <h3>Glosas em nível recorde — % da receita (2025)</h3>
+      <div class="chartbox"><canvas id="chGlosa"></canvas></div>
+      <div class="src">Fonte: Observatório Anahp 2026. Glosa = parcela da fatura contestada/não paga pela operadora. O recorde simultâneo de lucro das operadoras (R$ 24,4 bi) e de glosas nos hospitais mostra para onde a margem da cadeia se moveu no ciclo atual.</div>
+    </div>
+    <div class="card">
+      <h3>Perfil das internações — % das saídas hospitalares (2025)</h3>
+      <div class="chartbox"><canvas id="chIntern"></canvas></div>
+      <div class="src">Fonte: Observatório Anahp 2026 (hospitais privados). Oncologia já é a 2ª maior causa de internação — confirmação da transição epidemiológica que sustenta a tese de ONCO3 e dos cancer centers das grandes redes.</div>
+    </div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:18px">
+    <div class="card">
+      <h3>Estrutura e capacidade</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Fragmentação extrema:</b> a maioria dos 6,4 mil hospitais tem menos de 100 leitos — escala insuficiente para tecnologia, corpo clínico e barganha com operadoras. É o combustível de longo prazo da consolidação.</li>
+        <li><b>Filantrópicos</b> (Santas Casas) destinam 78% dos seus leitos ao SUS e operam sob estresse financeiro crônico — piso da enfermagem agravou.</li>
+        <li><b>Capacidade restrita:</b> ~2,2 leitos/1.000 hab vs ~4,3 na OCDE. O leito privado premium é escasso e concentrado nas capitais — sustenta pricing power de RDOR3/MATD3 nas praças fortes.</li>
+        <li><b>Eficiência em alta</b> (Anahp 2026): menor tempo de permanência e leve queda de ocupação = maior giro de leito; mortalidade em queda. Hospital-dia, cirurgia ambulatorial e desospitalização são a fronteira.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Capacidade e expansão das redes listadas</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>RDOR3:</b> 13.555 leitos (1T26); entregou 501 leitos em 2025 (acima da meta) e guidance de +2.690 leitos em 2026–28 (→ ~16,2 mil) — plano <i>reduzido</i> vs anterior, por disciplina de capital com juro alto.</li>
+        <li><b>HAPV3:</b> 86 hospitais próprios (~815 unidades incl. clínicas e diagnóstico); capex de verticalização segue (R$ 1 bi anunciado em SP, foco em rede própria e planos premium).</li>
+        <li><b>MATD3:</b> rede premium regional; alavanca é maturação/ocupação dos leitos novos, não abertura agressiva.</li>
+        <li><b>ONCO3:</b> modelo de cancer centers ambulatoriais — cresce sem leito, mas depende de relação com pagadoras (recebíveis).</li>
+        <li><b>Fora da bolsa:</b> Einstein e Sírio-Libanês (filantrópicos premium) competem pelo topo; Ímpar (JV Dasa+Amil) é a 2ª maior rede privada.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:18px"><b>Implicação para o modelo:</b> no curto prazo, o pêndulo da margem está com as operadoras (lucro recorde) e contra os hospitais (glosa recorde, recebíveis alongados) — monitorar dias de contas a receber e provisões de glosa nos resultados de RDOR3, ONCO3, MATD3 e DASA3. A desaceleração dos reajustes em 2026 tende a devolver parte do pêndulo ao longo de 2026–27.</div>
+</section>
+
+<!-- ================= BRASIL × MUNDO ================= -->
+<section class="tab" id="mundo">
+  <h2>Arquétipos de sistemas de saúde — onde o Brasil se encaixa</h2>
+  <p class="lead">Quase todo sistema nacional é variação de três modelos. O Brasil é um híbrido raro: promete um Beveridge universal (SUS), financia-o como país emergente, e deixou crescer por cima um mercado privado voluntário do tamanho do americano em proporção — é dessa contradição que nasce o setor listado na B3.</p>
+
+  <div class="chain">
+    <div class="node"><h4>Beveridge — imposto + provisão pública</h4><p>Reino Unido (NHS), Suécia, Espanha. Estado financia E entrega. Privado é nicho supletivo (~11–13% têm seguro). Fila é o racionador. <b>SUS é um Beveridge subfinanciado.</b></p></div>
+    <div class="node"><h4>Bismarck — seguro social compulsório</h4><p>Alemanha, França, Japão, Holanda. Contribuições obrigatórias, operadoras sem fim lucrativo ou reguladas, prestação mista. Gasto público/compulsório ~85%. Preço negociado centralmente.</p></div>
+    <div class="node"><h4>Mercado segurado — EUA</h4><p>Seguro privado como via principal (empregador), público residual (Medicare/Medicaid — que já são ~50% do gasto). Único país OCDE sem universalidade. Maior PIB% do mundo: 17%.</p></div>
+    <div class="node" style="border-top-color:var(--amber)"><h4>Dual — Brasil (e Austrália)</h4><p>Sistema universal + mercado privado voluntário grande e paralelo. Na Austrália, 45% têm cobertura privada incentivada por impostos; no Brasil, 25% pagam duas vezes (imposto + plano). <b>O plano substitui, não complementa, o público.</b></p></div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:24px">
+    <div class="card">
+      <h3>Gasto em saúde — % do PIB, público × privado</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chMundoGasto"></canvas></div>
+      <div class="src">Fontes: OCDE Health at a Glance 2023/25, OMS, Conta-Satélite IBGE (aprox., 2022–24). O Brasil gasta como país da OCDE (~9,7%), mas com a composição invertida: é o único caso de sistema universal onde o privado (5,7%) supera o público (4,0%). Na OCDE, 76% do gasto é público/compulsório; no Brasil, ~42%.</div>
+    </div>
+    <div class="card">
+      <h3>Leitos por 1.000 habitantes</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chMundoLeitos"></canvas></div>
+      <div class="src">Fontes: OCDE/OMS (2021–23, aprox.). O Brasil (2,2) opera com metade da média OCDE (4,3) — perto do Reino Unido pós-décadas de desospitalização, mas sem ter feito a transição: aqui é restrição de capital, não escolha de modelo. Escassez sustenta ocupação e preço do leito privado.</div>
+    </div>
+    <div class="card">
+      <h3>Sinistralidade (MLR) — Brasil × pagadoras dos EUA, 2025</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chMundoMLR"></canvas></div>
+      <div class="src">Fontes: ANS, releases das companhias, ACA. O contraste regulatório: nos EUA, MLR tem <b>piso</b> legal (80/85% — gastar menos que isso em saúde gera devolução ao cliente); no Brasil não há piso, e a sinistralidade é resultado do ciclo. Em 2025, as gigantes americanas operaram em stress (UNH 88,9%, Elevance 90%) enquanto o Brasil viveu o melhor ano da história (81,7%) — ciclos podem inverter.</div>
+    </div>
+    <div class="card">
+      <h3>Inflação médica projetada 2026 — % por região (WTW)</h3>
+      <div class="chartbox" style="height:340px"><canvas id="chMundoTrend"></canvas></div>
+      <div class="src">Fonte: WTW 2026 Global Medical Trends Survey (346 seguradoras, 82 países); Brasil = VCMH/IESS (12m até set/23, último público). Inflação médica de dois dígitos é fenômeno GLOBAL (10,3%), não disfunção brasileira — a LatAm (11,9%) acelera mais que todas as regiões exceto Ásia. Valida a premissa IPCA +6–8 p.p. do nosso modelo.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Margem EBITDA por elo — players brasileiros × pares globais (FY24-25, aprox.)</h3>
+    <div class="chartbox" style="height:420px"><canvas id="chMundoMargens"></canvas></div>
+    <div class="src">Fontes: divulgações das companhias (aprox.; critérios contábeis variam — IFRS16, ajustes). Verde = Brasil. A leitura: hospital privado brasileiro tem margem de elite global (MATD3 e o segmento hospitalar de RDOR3 rivalizam com a Índia, acima de HCA); diagnóstico brasileiro (FLRY3 26%) supera os líderes americanos (Quest ~19%); varejo farmacêutico brasileiro (RADL3 7%) ganha dos americanos em crise (Walgreens 3,5%). Margem alta aqui = escassez de capacidade + poder de marca — não ineficiência dos pares. <b>Mas margem não é valor: veja a seção ROIC × WACC abaixo.</b></div>
+  </div>
+
+  <h2 style="margin-top:38px">Excesso de retorno — ROIC × WACC: a comparação que importa</h2>
+  <p class="lead">Margem EBITDA ignora intensidade de capital e custo de capital. Com WACC nominal de ~15% no Brasil contra ~8,5% nos EUA, uma margem de elite pode destruir valor aqui enquanto uma margem mediana cria valor lá. Abaixo, cada barra é a "ponte" do WACC até o ROIC: <b style="color:var(--accent-dark)">azul</b> = excesso de retorno; <b style="color:var(--red)">vermelho</b> = o capital custa mais do que rende.</p>
+
+  <div class="grid cards2">
+    <div class="card">
+      <h3>Do WACC ao ROIC — a ponte de retorno de cada player (FY24-25e)</h3>
+      <div class="chartbox" style="height:380px"><canvas id="chRoicScatter"></canvas></div>
+      <div class="src"><b>Estimativas próprias para discussão</b> (ROIC contábil ≈ NOPAT/capital investido, aprox.; substituir pelos números auditados na fase CVM). A barra parte do WACC local e vai até o ROIC. WACC assumido: Brasil ~15% · EUA ~8,5% · Índia ~11,5% · Europa ~7,5% · Ásia/Austrália ~9% (nominais, moeda local, jun/2026).</div>
+    </div>
+    <div class="card">
+      <h3>Spread (ROIC − WACC) — ranking, p.p.</h3>
+      <div class="chartbox" style="height:380px"><canvas id="chSpread"></canvas></div>
+      <div class="src">A história muda de figura vs a comparação de margem: a HCA, com "só" 20% de margem, gera ~+10 p.p. de spread (WACC baixo + buyback agressivo + capital girando); RDOR3 e FLRY3, com margens de 25-26%, rodam spread contábil <i>negativo</i> com a Selic a 15%. A exceção brasileira é a SAUD3 (entra como ROE×Ke, ~25% vs ~17% — pagadora não se mede por ROIC); standalone, a antiga Odontoprev rodava ROIC ~30%.</div>
+    </div>
+  </div>
+
+  <div class="grid cards2" style="margin-top:16px">
+    <div class="card">
+      <h3>Como ler sem se enganar — 4 caveats</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Goodwill esconde o ROIC incremental.</b> HAPV3 contábil (~6%) carrega o goodwill da fusão GNDI; o ROIC <i>marginal</i> de abrir clínica/hospital próprio é muito maior. O par a observar no modelo: ROIC com e sem goodwill — um mede a qualidade do M&amp;A passado, o outro a economics do crescimento orgânico futuro.</li>
+        <li><b>Inflação infla o spread brasileiro.</b> Comparar spreads nominais entre países com inflações diferentes (BR ~4,5% vs EUA ~2,5%) superestima o Brasil em ~2 p.p. Em termos reais, o quadro fica ainda mais duro para os players locais.</li>
+        <li><b>Pagadoras pedem ROE × Ke, não ROIC × WACC.</b> Operadora quase não tem capital operacional — tem capital regulatório. SAUD3: ROE de 24,8% no 1T26 vs Ke ~17% (spread largamente positivo — e a antiga Odontoprev standalone rodava ROE ~28%). As operadoras médico-hospitalares em 2025: ROE turbinado pelo float a Selic 15% — que é exatamente o que se comprime quando o juro cai.</li>
+        <li><b>ROIC contábil olha para trás.</b> MATD3 e RDOR3 carregam capital de expansão ainda em maturação (leitos novos rampando); o ROIC de regime é maior que o fotografado. Ajustar por "capital em construção" na fase CVM.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Implicações para as teses</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>A tese Brasil é uma tese de WACC.</b> Com Selic a 15%, quase todo o setor roda spread contábil ≈ zero ou negativo — o equity só "abre" quando o juro cai. Cada −1 p.p. de WACC vale mais para RDOR3/ONCO3/DASA3 do que +1 p.p. de margem. É o driver D3 do nosso mapa, agora quantificado.</li>
+        <li><b>HCA mostra o destino, não o presente:</b> num país de WACC 8,5%, hospital consolidado é máquina de spread. O prêmio de quem comprar a tese RDOR3 hoje é capturar a convergência (margem já é de elite; falta o custo de capital convergir).</li>
+        <li><b>O único "compounder" clássico do setor era a Odontoprev</b> — que agora vive dentro da SAUD3. A Bradsaúde nasce com ROE de ~25%; o teste da tese é sustentá-lo com hospitais (capital-intensivos) entrando no mix, e o follow-on dirá a que preço o mercado compra essa história.</li>
+        <li><b>Filtro para o bloco CVM:</b> a pergunta-mestra dos comparáveis não será "qual margem?" e sim "qual ROIC incremental e a quanto de WACC?" — essa coluna entra na tabela de comparáveis.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 style="margin-top:38px">Espelhos globais — o playbook de cada tese brasileira já rodou lá fora</h2>
+  <div class="tablecard">
+  <table>
+    <thead><tr><th>Player global</th><th>País / elo</th><th>O que é</th><th>Espelho BR</th><th>A lição</th></tr></thead>
+    <tbody>
+      <tr><td><b>Kaiser Permanente</b></td><td class="small">EUA · verticalizada (não listada)</td><td class="small">Plano + hospitais + médicos próprios; 12,5 mi de vidas; o modelo integrado original (anos 1940)</td><td><span class="tk2">HAPV3</span></td><td class="small">Verticalização funciona há 80 anos — mas exige densidade regional e décadas de cultura; não escala por M&amp;A rápido sem dor (a lição da integração GNDI)</td></tr>
+      <tr><td><b>UnitedHealth / Optum</b></td><td class="small">EUA · pagadora + serviços</td><td class="small">Maior seguradora do mundo comprou prestação/dados (Optum = ~50% do lucro)</td><td><span class="tk2">RDOR3</span> + SulAmérica (direção inversa)</td><td class="small">Integração pagador-prestador é o fim de jogo dos dois mercados; e 2025 mostrou seu risco: utilização surpreende e MLR vai a 89% — margem integrada não é imune ao ciclo</td></tr>
+      <tr><td><b>HCA Healthcare</b></td><td class="small">EUA · hospitais</td><td class="small">186 hospitais, margem ~20,5%, máquina de buyback; consolidou nos anos 90-2000</td><td><span class="tk2">RDOR3</span></td><td class="small">O playbook RDOR é o playbook HCA com 30 anos de defasagem: escala em praças densas, disciplina de capital, share ganho de Santas Casas/independentes</td></tr>
+      <tr><td><b>Apollo Hospitals</b></td><td class="small">Índia · hospitais + farmácia + digital</td><td class="small">Hospitais (25% margem standalone) + maior rede de farmácias da Índia + telessaúde</td><td><span class="tk2">RDOR3</span> + <span class="tk2">RADL3</span></td><td class="small">O mercado premia EM com demografia + subpenetração: Apollo negocia a múltiplos altíssimos. O Brasil tem a mesma tese demográfica — sem o mesmo múltiplo</td></tr>
+      <tr><td><b>IHH Healthcare</b></td><td class="small">Malásia/Singapura/Turquia · hospitais</td><td class="small">Maior rede hospitalar listada da Ásia (~80 hospitais), margem ~23%</td><td><span class="tk2">RDOR3</span>, <span class="tk2">MATD3</span></td><td class="small">Hospital premium em mercado de capacidade escassa sustenta 20%+ de margem por décadas — o risco não é margem, é capital mal alocado em expansão</td></tr>
+      <tr><td><b>Fresenius / Helios</b></td><td class="small">Alemanha · hospitais + diálise</td><td class="small">Maior rede privada da Europa; margens ~10-12% sob preço regulado (DRG)</td><td class="small">contraexemplo</td><td class="small">O teto do setor: quando o pagador é o Estado com tabela DRG, a margem hospitalar cai pela metade — é o cenário de risco regulatório extremo para o Brasil</td></tr>
+      <tr><td><b>Quest / Labcorp</b></td><td class="small">EUA · diagnóstico</td><td class="small">Duopólio do lab americano; margens 16-20%; crescem comprando lab de hospital</td><td><span class="tk2">FLRY3</span>, <span class="tk2">DASA3</span></td><td class="small">Diagnóstico maduro vira jogo de rota/escala com margem cadente — a defesa da Fleury (premium + novos elos) é a resposta certa à comoditização que os EUA já viveram</td></tr>
+      <tr><td><b>Sonic Healthcare</b></td><td class="small">Austrália · diagnóstico global</td><td class="small">Consolidador multinacional de labs (AU, DE, EUA, UK)</td><td><span class="tk2">FLRY3</span></td><td class="small">Lab viaja mal entre países (pagador e regulação locais) — consolidação doméstica primeiro; internacionalização raramente cria valor no elo</td></tr>
+      <tr><td><b>CVS Health</b></td><td class="small">EUA · varejo + PBM + seguradora (Aetna)</td><td class="small">Farmácia + gestão de benefício + plano: o ecossistema completo — e múltiplo deprimido</td><td><span class="tk2">RADL3</span> (ambição "RD Saúde")</td><td class="small">O mercado não paga prêmio por ecossistema sem execução: a opcionalidade de saúde da RD vale algo, mas o core (abrir loja com ROIC alto) é o que sustenta a tese</td></tr>
+      <tr><td><b>Ramsay Health Care</b></td><td class="small">Austrália · hospitais</td><td class="small">Rede dual-market (AU/Europa); margem comprimida (~13%) por custo de pessoal e pagadora dura</td><td class="small">alerta</td><td class="small">Mesmo em sistema dual maduro, hospital sem poder de barganha vira tomador de preço — o pêndulo operadora×prestador não é exclusividade brasileira</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 style="margin-top:38px">Semelhanças × antagonismos</h2>
+  <div class="grid cards2">
+    <div class="card">
+      <h3>🌍 Onde o Brasil é igual ao mundo</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Inflação médica de dois dígitos:</b> global 10,3% (WTW 2026). VCMH alto não é jabuticaba — é a física do setor (tecnologia aditiva + envelhecimento + fee-for-service).</li>
+        <li><b>Envelhecimento como demanda estrutural:</b> mesma curva da OCDE com 20–30 anos de defasagem — o que dá ao Brasil o "roteiro" do que vem (Japão é o spoiler).</li>
+        <li><b>Consolidação e verticalização:</b> o movimento Hapvida/Rede D'Or repete Kaiser, UNH/Optum e HCA — pagador e prestador convergem em todo mercado maduro.</li>
+        <li><b>Pressão sobre o fee-for-service:</b> DRG na Alemanha, value-based nos EUA, bundles na Austrália — a transição de remuneração (nosso D11) é agenda global.</li>
+        <li><b>Diagnóstico comoditizando:</b> o roteiro Quest/Labcorp (margem cadente, escala como defesa) é o futuro provável do elo no Brasil.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>⚡ Onde o Brasil é único (e isso muda o modelo)</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Gasto público de 42% num sistema universal</b> (OCDE: 76%): o SUS subfinanciado empurra classe média ao privado — é o subsídio invisível que cria o TAM das listadas.</li>
+        <li><b>Juro real altíssimo:</b> 60% do lucro 2025 das operadoras é financeiro. UNH não tem isso. Modelar pagadora brasileira sem modelar Selic é erro de espécie.</li>
+        <li><b>Sem piso de MLR:</b> nos EUA a ACA devolve prêmio se sinistralidade &lt; 80/85%; aqui margem de subscrição é livre — upside maior no topo do ciclo, e risco político por isso mesmo.</li>
+        <li><b>Preço tabelado só no individual:</b> congelou o produto individual (14,5% das vidas) e fez o coletivo ser o mercado real — não existe paralelo direto lá fora.</li>
+        <li><b>Rol exemplificativo + judicialização:</b> o oposto do NICE britânico (que nega cobertura por custo-efetividade). Cauda de custo aberta que nenhum par global precifica.</li>
+        <li><b>Capacidade hospitalar escassa</b> (2,2 leitos/1.000): margem hospitalar de elite global é renda de escassez — sustentável enquanto capital para construir leito seguir caro.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;border-left:4px solid var(--amber)">
+    <h3>🇦🇺 Austrália — o sistema mais parecido com o Brasil (e o que ela ensina)</h3>
+    <div class="grid cards2" style="margin-top:10px">
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px">
+        <li><b>Mesma arquitetura dual:</b> Medicare universal financiado por imposto + mercado privado voluntário paralelo — gasto de ~9,8% do PIB (vs 9,7% BR) e leitos em 3,8/1.000. É o Brasil com mais dinheiro público (73% vs 42%).</li>
+        <li><b>Penetração de 45% vs nossos 25% — e o porquê:</b> o Estado australiano <i>paga</i> para a classe média ter plano: sobretaxa de imposto para quem não tem (Medicare Levy Surcharge), rebate fiscal no prêmio e carregamento vitalício por adesão tardia (Lifetime Health Cover). É o teto de renda brasileiro resolvido por desenho regulatório — exatamente o que a revisão da Lei 9.656 (driver D8) poderia destravar aqui.</li>
+        <li><b>Community rating + equalização de risco:</b> preço único por produto (sem seleção por idade/risco) com fundo compensando operadoras de carteira mais velha — o mecanismo que o Brasil só tem parcialmente (pool etário 0–59+).</li>
+      </ul>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px">
+        <li><b>Pagadoras australianas vivem com MLR ~84–86%</b> (Medibank/NIB) e margens estáveis — reguladas, previsíveis, dividend stocks. É o futuro provável das pagadoras brasileiras num cenário de regulação madura: menos upside de ciclo, mais previsibilidade.</li>
+        <li><b>O alerta está nos hospitais:</b> Ramsay, a maior rede do país, opera com margem de ~13% e ROIC abaixo do WACC — porque enfrenta pagadoras concentradas e custo de pessoal indexado. No sistema dual maduro, <b>o poder migrou do prestador para a pagadora</b>. RDOR3/MATD3 desfrutam hoje de um equilíbrio (escassez de leitos + marca) que a regulação e a consolidação das pagadoras podem erodir em 10–15 anos.</li>
+        <li><b>Síntese para o modelo:</b> a Austrália é o cenário "regulação resolve o TAM": mais vidas (45% de cobertura), margens menores e estáveis em toda a cadeia. Bom para volume (HAPV3, SAUD3), neutro-negativo para margem de prestador premium.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:18px"><b>Lições diretas para as premissas do modelo:</b> (1) o stress das pagadoras americanas em 2025 (MLR 89–90%) é o lembrete de que o 81,7% brasileiro é topo de ciclo, não novo normal — manter sinistralidade normalizada em 82–84%; (2) WTW projeta LatAm a 11,9% em 2026 — nossa banda de VCMH (IPCA +5–7) é até conservadora; (3) hospitais EM sustentam EBITDA de 20–26% por décadas (IHH, Apollo, Max) — a margem de RDOR3/MATD3 é defensável estruturalmente; (4) o cenário Fresenius/Helios (preço tabelado → margem cai pela metade) é a régua do risco regulatório de cauda.</div>
+</section>
+
+<!-- ================= PLAYERS ================= -->
+<section class="tab" id="players">
+  <h2>Mapa das companhias listadas</h2>
+  <p class="lead">Universo de cobertura proposto, organizado por elo da cadeia. Números de receita e margem são <b>aproximações de 2024</b> para dimensionamento relativo — a primeira tarefa do projeto é atualizá-los com as últimas divulgações (CVM/RI).</p>
+
+  <div class="grid cards2">
+    <div class="card">
+      <h3>Receita líquida 2024-25e — R$ bi (aprox.)</h3>
+      <div class="chartbox" style="height:420px"><canvas id="chReceita"></canvas></div>
+      <div class="src">Fonte: divulgações das companhias (aprox., consolidado). RDOR3 inclui SulAmérica. Atualizar com últimos 12 meses.</div>
+    </div>
+    <div class="card">
+      <h3>Como ler o universo</h3>
+      <ul style="font-size:13.5px;color:var(--ink-2);padding-left:18px;display:grid;gap:8px;margin-top:6px">
+        <li><b>Três gigantes integrados</b> dominam: RDOR3 (hospital premium + seguradora, ~R$ 60 bi), SAUD3 (Bradsaúde: seguradora líder + odonto + hospitais, ~R$ 52 bi, estreia mai/26) e HAPV3 (verticalizada de ticket baixo) — três apostas distintas sobre o futuro do modelo.</li>
+        <li><b>Varejo farmacêutico</b> (RADL3) é o maior player defensivo: cresce com demografia, sem risco de sinistralidade.</li>
+        <li><b>Diagnóstico</b> (FLRY3, DASA3) consolidado, mas comoditizando — alavanca é eficiência e novos elos (hospital-dia, oncologia, link com operadoras).</li>
+        <li><b>Qualidade de margem ≠ tamanho:</b> MATD3 é pequena com margem e ROIC altos (e a Odontoprev, hoje dentro da SAUD3, era o caso clássico); DASA3 e VVEO3 são grandes com balanços pressionados.</li>
+        <li><b>Players relevantes fora da bolsa</b> (benchmark obrigatório): Amil, sistema Unimed, Prevent Senior, Einstein, Sírio-Libanês, EMS, Eurofarma. Bradesco Saúde saiu desta lista — agora está listado via SAUD3.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="tablecard">
+  <table>
+    <thead><tr><th>Companhia</th><th>Modelo / tese</th><th style="text-align:right">Receita 24e (R$ bi)</th><th style="text-align:right">Mg. EBITDA (aprox.)</th><th>Pontos de atenção</th></tr></thead>
+    <tbody>
+      <tr class="seg"><td colspan="5">Pagadoras / Verticalizadas</td></tr>
+      <tr><td><span class="tk2">SAUD3</span> Bradsaúde <span class="pill up" style="margin-left:4px">novo · mai/26</span></td><td class="small">Holding de saúde do Bradesco (91,35%): Bradesco Saúde (~4 mi vidas, 83% do lucro) + Odontoprev (9,4 mi) + Mediservice + Atlântica Hospitais (JV c/ Rede D'Or, ~3,6 mil leitos) + Orizon + participação na Fleury. 2º maior grupo do setor</td><td class="num">~52 (2025)</td><td class="num">ROE ~25%</td><td class="small">Free float &lt;10% (follow-on à vista p/ chegar a 20%); execução do cross-sell; sinistralidade 79% no 1T26; conglomerado vs foco</td></tr>
+      <tr><td><span class="tk2">HAPV3</span> Hapvida</td><td class="small">Operadora verticalizada de ticket baixo (rede própria); líder em vidas após fusão com GNDI</td><td class="num">~29</td><td class="num">~11–12%</td><td class="small">Execução da integração; sinistralidade; churn vs reajuste; alavancagem</td></tr>
+      <tr><td><span class="tk2">QUAL3</span> Qualicorp</td><td class="small">Administradora de benefícios (coletivo por adesão); intermediação sem risco de sinistro</td><td class="num">~1,6</td><td class="num">~28%</td><td class="small">Base de vidas em queda há anos; dependência de reajuste; alavancagem; tese de turnaround</td></tr>
+      <tr class="seg"><td colspan="5">Prestadores — Hospitais &amp; Oncologia</td></tr>
+      <tr><td><span class="tk2">RDOR3</span> Rede D'Or + SulAmérica</td><td class="small">Maior rede hospitalar premium + seguradora; integração pagador-prestador "por cima"</td><td class="num">~52</td><td class="num">~13–14% (consol.)</td><td class="small">Sinergias da integração; expansão de leitos (capex); juros (alavancagem); glosas</td></tr>
+      <tr><td><span class="tk2">ONCO3</span> Oncoclínicas</td><td class="small">Maior plataforma de oncologia da AL; beneficiária direta da transição epidemiológica</td><td class="num">~6,5</td><td class="num">~16%</td><td class="small">Capital de giro / recebíveis; alavancagem; relação com pagadoras; governança</td></tr>
+      <tr><td><span class="tk2">MATD3</span> Mater Dei</td><td class="small">Hospitais premium regionais (MG + expansão); histórico de margem best-in-class</td><td class="num">~2,4</td><td class="num">~26%</td><td class="small">Maturação dos ativos adquiridos; concentração regional; liquidez do papel</td></tr>
+      <tr class="seg"><td colspan="5">Prestadores — Medicina Diagnóstica</td></tr>
+      <tr><td><span class="tk2">FLRY3</span> Fleury (+Pardini)</td><td class="small">Diagnóstico premium + marcas regionais; diversificação para "novos elos" (infusão, ortopedia)</td><td class="num">~8,2</td><td class="num">~26%</td><td class="small">Crescimento orgânico baixo; pressão de preço das operadoras; integração Pardini concluída</td></tr>
+      <tr><td><span class="tk2">DASA3</span> Dasa</td><td class="small">Maior rede de diagnóstico + hospitais (JV Ímpar com Amil); reestruturação em curso</td><td class="num">~15,5</td><td class="num">~12–13%</td><td class="small">Alavancagem elevada; venda de ativos; free float baixo; risco de execução da JV</td></tr>
+      <tr class="seg"><td colspan="5">Indústria Farmacêutica</td></tr>
+      <tr><td><span class="tk2">HYPE3</span> Hypera</td><td class="small">Maior farma nacional listada (marcas, OTC, genéricos); máquina de lançamentos</td><td class="num">~7,7</td><td class="num">~30%+</td><td class="small">Ajuste de sell-in/estoques 2024–25; capital de giro; CMED limita preço; M&amp;A (proposta EMS recusada)</td></tr>
+      <tr><td><span class="tk2">BLAU3</span> Blau</td><td class="small">Farma institucional/hospitalar (biológicos, injetáveis, biossimilares)</td><td class="num">~1,6</td><td class="num">~22%</td><td class="small">Concentração em licitações/canal institucional; pipeline de biossimilares; competição</td></tr>
+      <tr class="seg"><td colspan="5">Varejo &amp; Distribuição</td></tr>
+      <tr><td><span class="tk2">RADL3</span> Raia Drogasil</td><td class="small">Líder do varejo farmacêutico (~16% share); expansão + digital/mídia de varejo</td><td class="num">~38</td><td class="num">~7%</td><td class="small">Maturação de lojas novas; competição (PGMN3, independentes); margem vs crescimento</td></tr>
+      <tr><td><span class="tk2">PGMN3</span> Pague Menos (+Extrafarma)</td><td class="small">Varejo farmacêutico com foco em Norte/Nordeste e classes C/D</td><td class="num">~12,6</td><td class="num">~6%</td><td class="small">Alavancagem pós-Extrafarma; margem fina; sensibilidade a renda</td></tr>
+      <tr><td><span class="tk2">PNVL3</span> Panvel (Dimed)</td><td class="small">Varejo farmacêutico regional (Sul) verticalizado com distribuição</td><td class="num">~4,6</td><td class="num">~6%</td><td class="small">Concentração regional; expansão gradual; liquidez do papel</td></tr>
+      <tr><td><span class="tk2">VVEO3</span> Viveo</td><td class="small">Distribuição de materiais/medicamentos hospitalares e serviços</td><td class="num">~4,0</td><td class="num">~8%</td><td class="small">Reestruturação de dívida (2025); margem comprimida; tese de recuperação — alto risco</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src" style="font-size:11px;color:var(--ink-3);margin-top:10px">Notas: Kora Saúde (KRSA3) em processo de fechamento de capital/OPA — confirmar status antes de incluir. Empresas correlatas fora do core: NTCO/biofarma animal (OFSA3), healthtechs não listadas. Margens EBITDA em critérios distintos entre cias (IFRS16, ajustes) — padronizar no modelo.</p>
+</section>
+
+<!-- ================= PREMISSAS ================= -->
+<section class="tab" id="premissas">
+  <h2>Esqueleto de premissas para o modelo</h2>
+  <p class="lead">Estrutura inicial — os valores abaixo são pontos de partida derivados do histórico, para calibrarmos juntos. A coluna "sensibilidade" indica quais players cada premissa move mais.</p>
+
+  <div class="tablecard">
+  <table>
+    <thead><tr><th>Premissa</th><th>Pessimista</th><th>Base</th><th>Otimista</th><th>Racional / âncora</th><th>Sensibilidade maior</th></tr></thead>
+    <tbody>
+      <tr><td><b>Crescimento de vidas (méd.-hosp.)</b></td><td class="num">0% a.a.</td><td class="num">+1,5–2,0% a.a.</td><td class="num">+3,0% a.a.</td><td class="small">Últimos 12m: +3,6% (mar/26, ANS) — acima do histórico 2020–25 (~+1,7% a.a.); teto de renda limita; otimista assume reforma regulatória/produto acessível</td><td class="small">HAPV3, QUAL3, SAUD3</td></tr>
+      <tr><td><b>Reajuste médio (coletivos)</b></td><td class="num">IPCA +2pp</td><td class="num">IPCA +4–6pp</td><td class="num">IPCA +8pp</td><td class="small">Trajetória real: 14,1% (2023) → 13,2% (2024) → 10,8% (2025) → 9,9% (2026) — convergindo para o padrão de inflação médica</td><td class="small">HAPV3, RDOR3 (SulAmérica)</td></tr>
+      <tr><td><b>Sinistralidade normalizada</b></td><td class="num">88%</td><td class="num">82–84%</td><td class="num">79%</td><td class="small">2025 fechou em 81,7% (mínima desde 2020) — provável topo de ciclo; média pré-pandemia ~84–86%; medicina de grupo opera em ~77%</td><td class="small">HAPV3, RDOR3</td></tr>
+      <tr><td><b>Inflação médica (VCMH)</b></td><td class="num">IPCA +9pp</td><td class="num">IPCA +5–7pp</td><td class="num">IPCA +3pp</td><td class="small">Série IESS 2007–19: média ~14% a.a. ≈ IPCA +8pp; otimista assume mudança de modelos de remuneração e ganho de eficiência (IA)</td><td class="small">Todas as pagadoras</td></tr>
+      <tr><td><b>Crescimento volume hospitalar</b></td><td class="num">+2% a.a.</td><td class="num">+4–6% a.a.</td><td class="num">+8% a.a.</td><td class="small">Envelhecimento + expansão de leitos; limitado por capacidade de pagamento das operadoras</td><td class="small">RDOR3, MATD3, ONCO3</td></tr>
+      <tr><td><b>Selic média (3 anos)</b></td><td class="num">13%</td><td class="num">10–11%</td><td class="num">8%</td><td class="small">Define resultado financeiro de pagadoras vs custo de dívida de prestadores</td><td class="small">DASA3, ONCO3, RDOR3, VVEO3</td></tr>
+      <tr><td><b>Varejo farma — SSS</b></td><td class="num">IPCA</td><td class="num">IPCA +2–3pp</td><td class="num">IPCA +5pp</td><td class="small">Demografia + reajuste CMED + maturação; competição limita</td><td class="small">RADL3, PGMN3, PNVL3</td></tr>
+      <tr><td><b>Risco regulatório (binário)</b></td><td class="small" colspan="3" style="text-align:center">cenários: tabelamento de coletivos (cauda negativa) · reforma pró-individual (cauda positiva)</td><td class="small">Revisão da Lei 9.656 em tramitação — tratar como árvore de cenários, não como média</td><td class="small">Todas</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 style="margin-top:34px">Próximos blocos a construir (backlog)</h2>
+  <div class="grid cards2">
+    <div class="card"><h3>📊 Bloco financeiro comparável</h3><p style="font-size:13.5px;color:var(--ink-2);margin-top:6px">Padronizar para todas as cias: receita, EBITDA (critério único), margem, dívida líquida/EBITDA, ROIC, conversão de caixa, capex/receita — últimos 5 anos + LTM. Fonte: ITRs/DFPs via CVM ou RI. Vira a aba "Comparáveis" deste dashboard.</p></div>
+    <div class="card"><h3>📈 Valuation relativo</h3><p style="font-size:13.5px;color:var(--ink-2);margin-top:6px">EV/EBITDA, P/L, FCF yield — atual vs média histórica de 5 anos por papel, e vs pares globais (UNH, HCA, Fresenius, IHH). Identificar onde o de-rating do setor abriu assimetria.</p></div>
+    <div class="card"><h3>🔍 Deep dives por tese</h3><p style="font-size:13.5px;color:var(--ink-2);margin-top:6px">Ordem sugerida: (1) HAPV3 × RDOR3 — os dois modelos de integração; (2) RADL3 — composto defensivo; (3) ONCO3/DASA3 — teses de balanço; (4) HYPE3 — normalização pós-ajuste de estoques.</p></div>
+    <div class="card"><h3>🗓 Monitoramento recorrente</h3><p style="font-size:13.5px;color:var(--ink-2);margin-top:6px">Mensal: CAGED, dados de beneficiários ANS, prévia IPCA saúde. Trimestral: sinistralidade ANS, resultados das cias, VCMH/IESS. Eventos: tramitação da revisão da Lei 9.656, decisões ANS sobre reajuste.</p></div>
+  </div>
+</section>
+
+<!-- ================= FONTES ================= -->
+<section class="tab" id="fontes">
+  <h2>Fontes primárias e de pesquisa</h2>
+  <p class="lead">Mapa de fontes validado na etapa anterior do projeto — organizado por uso.</p>
+  <div class="grid cards2">
+    <div class="card"><h3>Saúde suplementar (core p/ pagadoras)</h3>
+      <ul style="font-size:13.5px;padding-left:18px;display:grid;gap:6px;margin-top:6px">
+        <li><a href="https://www.gov.br/ans/pt-br/acesso-a-informacao/perfil-do-setor/dados-e-indicadores-do-setor" target="_blank">ANS — Dados e Indicadores do Setor</a> (TABNET, Caderno trimestral)</li>
+        <li><a href="https://www.ans.gov.br/images/stories/Materiais_para_pesquisa/Perfil_setor/sala-de-situacao.html" target="_blank">ANS — Sala de Situação</a> (dashboard mensal: vidas, sinistralidade por operadora)</li>
+        <li><a href="https://www.iess.org.br/" target="_blank">IESS</a> (VCMH, análises de saúde suplementar)</li>
+      </ul></div>
+    <div class="card"><h3>SUS, epidemiologia e capacidade</h3>
+      <ul style="font-size:13.5px;padding-left:18px;display:grid;gap:6px;margin-top:6px">
+        <li><a href="https://datasus.saude.gov.br/informacoes-de-saude-tabnet/" target="_blank">DATASUS / TABNET</a> (SIM, SIH, SIA, CNES — leitos e estabelecimentos)</li>
+        <li><a href="https://opendatasus.saude.gov.br/" target="_blank">OpenDATASUS</a> (microdados)</li>
+        <li><a href="https://www.conass.org.br/guiainformacao/fontes-de-informacao/" target="_blank">CONASS — guia de fontes</a></li>
+      </ul></div>
+    <div class="card"><h3>Macro, demografia e gasto</h3>
+      <ul style="font-size:13.5px;padding-left:18px;display:grid;gap:6px;margin-top:6px">
+        <li><a href="https://www.ibge.gov.br/estatisticas/economicas/contas-nacionais/9056-conta-satelite-de-saude.html" target="_blank">IBGE — Conta-Satélite de Saúde</a> (gasto % PIB)</li>
+        <li><a href="https://www.ibge.gov.br/estatisticas/sociais/saude/9160-pesquisa-nacional-de-saude.html" target="_blank">IBGE — PNS</a> (acesso, cobertura, crônicos)</li>
+        <li>IBGE — Projeções populacionais · CAGED (Min. Trabalho) · SIOPS (gasto público)</li>
+      </ul></div>
+    <div class="card"><h3>Mercado, players e benchmark</h3>
+      <ul style="font-size:13.5px;padding-left:18px;display:grid;gap:6px;margin-top:6px">
+        <li><a href="https://www.anahp.com.br/" target="_blank">Observatório ANAHP</a> (indicadores hospitalares anuais; <a href="https://www.anahp.com.br/noticias/observatorio-anahp-2026-aponta-avancos-e-desafios-no-sistema-de-saude/" target="_blank">edição 2026</a>)</li>
+        <li>RI das companhias + <a href="https://www.gov.br/cvm" target="_blank">CVM</a> (ITR/DFP/fatos relevantes)</li>
+        <li><a href="https://basedosdados.org/" target="_blank">Base dos Dados</a> (bases ANS/DATASUS tratadas, p/ análise quantitativa)</li>
+        <li><a href="https://saudeamanha.fiocruz.br/" target="_blank">Fiocruz Saúde Amanhã</a> · IPEA (prospecção de longo prazo)</li>
+        <li><a href="https://www.oecd.org/en/publications/2025/11/health-at-a-glance-2025_a894f72e.html" target="_blank">OCDE — Health at a Glance</a> (benchmarks internacionais: gasto, leitos, financiamento)</li>
+        <li><a href="https://www.wtwco.com/en-us/news/2025/11/double-digit-healthcare-cost-increases-projected-to-persist-into-2026-and-beyond" target="_blank">WTW — Global Medical Trends Survey</a> (inflação médica por região)</li>
+      </ul></div>
+  </div>
+</section>
+
+</main>
+
+<footer>Documento de trabalho · uso interno · valores aproximados sujeitos a validação nas fontes primárias · estrutura de dados editável no bloco <code>DATA</code> do código-fonte</footer>
+
+<script>
+/* =====================================================================
+   DATA — bloco único de dados. Para atualizar o dashboard, edite aqui.
+   Todos os valores são aproximações de fontes públicas (ver aba Fontes).
+   ===================================================================== */
+const DATA = {
+  gasto: { labels:["Privado (famílias + planos)","Público (SUS)"], valores:[668, 489] }, // R$ bi, 2024e (ANAHP/IBGE)
+  beneficiarios: { // ANS/TABNET — série OFICIAL, posição de dezembro de cada ano (2026 = março)
+    anos:[2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],
+    mi:[31.0,31.4,31.5,32.1,33.8,35.4,37.2,39.3,41.5,42.6,44.9,46.0,47.8,49.5,50.5,49.3,47.7,47.1,47.1,47.1,47.9,49.3,50.5,51.3,52.0,53.0,52.9],
+    odonto:[2.6,3.1,3.7,4.3,5.3,6.2,7.3,9.2,11.1,13.3,14.5,16.7,18.5,19.6,20.1,20.8,21.2,22.3,24.0,25.3,25.9,28.1,30.0,32.4,34.6,35.6,35.8]
+  },
+  reajuste: { // % a.a. — teto ANS individuais (série oficial completa desde 2000), média dos coletivos (ANS) e IPCA (IBGE, fechado no ano)
+    anos:[2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],
+    ans:[5.42,8.71,7.69,9.27,11.75,11.69,8.89,5.76,5.48,6.76,6.73,7.69,7.93,9.04,9.65,13.55,13.57,13.55,10.00,7.35,8.14,-8.19,15.50,9.63,6.91,6.06,5.11],
+    coletivos:[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,14.13,13.18,10.76,9.90],
+    ipca:[5.97,7.67,12.53,9.30,7.60,5.69,3.14,4.46,5.90,4.31,5.91,6.50,5.84,5.91,6.41,10.67,6.29,2.95,3.75,4.31,4.52,10.06,5.79,4.62,4.83,4.50,3.81] // 2025 aprox.; 2026 = 12m até abr
+  },
+  sinistralidade: { anos:[2018,2019,2020,2021,2022,2023,2024,2025], pct:[84.5,85.9,76.0,86.0,89.2,87.0,83.8,81.7] }, // 2020-25 oficiais (releases ANS); 2018-19 aprox.
+  leitos: { // CNES/DATASUS (extração própria) — leitos de internação, dez de cada ano, mil (2026 = abr)
+    anos:[2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],
+    total:[466,467,459,461,461,463,458,456,452,452,442,438,437,433,431,448,448,449,450,455,459,458],
+    sus:[355,354,344,343,338,335,331,326,321,319,312,308,303,300,295,313,310,309,310,314,317,316]
+  },
+  demografia: { anos:[1980,1991,2000,2010,2022,2030,2040,2050,2060], pct65:[4.0,4.8,5.6,7.3,10.9,13.1,17.8,21.9,25.0] }, // Censos IBGE até 2022; projeções (rev. 2024) depois
+  horizonte: [ // mapa de horizonte dos drivers: janela [ini,fim], grupo (1=ciclo 2=estrutural 3=secular), pico, impacto 1-5, previsibilidade 1-5, racional
+    {n:"D1 Emprego formal (CAGED)",      g:1, ini:2026, fim:2029, pico:2027, imp:4, prev:3, r:"ciclo econômico corrente define adições de vidas"},
+    {n:"D2 Reajuste × sinistralidade",   g:1, ini:2026, fim:2028, pico:2027, imp:5, prev:3, r:"topo de margem em 2025; defasagem de 12-18m decide 2027"},
+    {n:"D3 Juros (Selic)",               g:1, ini:2026, fim:2029, pico:2027, imp:4, prev:3, r:"ciclo de afrouxamento inverte o jogo pagadora × prestador"},
+    {n:"D4 Glosas & prazos",             g:1, ini:2026, fim:2028, pico:2026, imp:3, prev:4, r:"pêndulo no extremo pró-operadora; reverte com a normalização"},
+    {n:"D5 Câmbio (insumos)",            g:1, ini:2026, fim:2029, pico:2027, imp:2, prev:1, r:"choque cambial bate no COGS em 6-12m"},
+    {n:"D6 Verticalização",              g:2, ini:2026, fim:2034, pico:2030, imp:5, prev:4, r:"migração de share para o modelo de menor custo"},
+    {n:"D7 Consolidação / M&A",          g:2, ini:2026, fim:2036, pico:2030, imp:4, prev:4, r:"funil de ~12 operadoras/ano + hospitais sem escala"},
+    {n:"D8 Revisão Lei 9.656",           g:2, ini:2026, fim:2031, pico:2028, imp:5, prev:1, r:"binário: reabre o individual ou trava o coletivo"},
+    {n:"D9 Judicialização & rol",        g:2, ini:2026, fim:2033, pico:2029, imp:4, prev:3, r:"cauda de custo até estabilização jurisprudencial"},
+    {n:"D10 Digital, dados & IA",        g:2, ini:2027, fim:2036, pico:2031, imp:3, prev:2, r:"ganho de eficiência difuso; prêmio ao dado proprietário"},
+    {n:"D11 Modelos de remuneração",     g:2, ini:2028, fim:2038, pico:2033, imp:4, prev:2, r:"transição lenta do fee-for-service; redistribui risco"},
+    {n:"D12 Envelhecimento",             g:3, ini:2026, fim:2045, pico:2040, imp:5, prev:5, r:"65+ dobra até 2050; demanda 4-6x por idoso"},
+    {n:"D13 Transição epidemiológica",   g:3, ini:2026, fim:2045, pico:2038, imp:4, prev:5, r:"DCNT e câncer dominam a carga de doença"},
+    {n:"D14 Inflação médica estrutural", g:3, ini:2026, fim:2045, pico:2036, imp:5, prev:4, r:"VCMH ~IPCA+8pp há 17 anos; tecnologia aditiva"},
+    {n:"D15 Teto de renda / penetração", g:3, ini:2026, fim:2040, pico:2034, imp:4, prev:4, r:"cobertura travada em 22-24% desde 2014"}
+  ],
+  mundo: { // benchmarks internacionais (OCDE/OMS 2022-24, aprox.; EUA 2024 oficial; Brasil = Conta-Satélite)
+    gasto: { paises:["EUA","Alemanha","França","Japão","Reino Unido","Austrália","OCDE (média)","BRASIL","Chile","China","México","Índia"],
+      pub:[14.3,9.9,9.7,9.7,9.0,7.2,7.0,4.0,5.6,3.9,2.9,1.2],
+      priv:[2.9,1.8,1.8,1.8,1.9,2.6,2.2,5.7,3.5,3.1,2.8,2.1] },
+    leitos: { paises:["Coreia do Sul","Japão","Alemanha","França","China","OCDE (média)","Austrália","EUA","Reino Unido","BRASIL","Chile","México","Índia"],
+      v:[12.8,12.6,7.8,5.7,5.0,4.3,3.8,2.8,2.4,2.2,1.9,1.0,0.5] },
+    mlr: { labels:["Brasil — medicina de grupo (25)","ACA mínimo small group (EUA)","Brasil — setor (2025)","Brasil — seguradoras (2025)","Cigna (2025)","ACA mínimo large group (EUA)","Medibank (Austrália, aprox.)","UnitedHealth (2025)","Elevance (2025)"],
+      v:[77.2,80,81.7,82.3,84.4,85,86,88.9,90.0] },
+    trend: { labels:["Europa","América do Norte","Global","Oriente Médio/África","América Latina","Brasil (VCMH últ. público)","Ásia-Pacífico"],
+      v:[8.2,9.2,10.3,11.3,11.9,12.7,14.0] }, // WTW 2026 Global Medical Trends; Brasil = VCMH/IESS 12m set/23
+    margens: [ // margem EBITDA aprox. por elo (FY2024-25); pagadoras ficam no gráfico de MLR
+      {n:"Max Healthcare (Índia)", v:27, elo:"hosp"},{n:"MATD3 — Mater Dei", v:26, elo:"hosp"},
+      {n:"RDOR3 — hospitais (segm.)", v:25, elo:"hosp"},{n:"Fortis (Índia)", v:24, elo:"hosp"},
+      {n:"IHH (Ásia)", v:23, elo:"hosp"},{n:"HCA (EUA)", v:20.5, elo:"hosp"},{n:"Ramsay (Austrália)", v:13, elo:"hosp"},
+      {n:"FLRY3 — Fleury", v:26, elo:"diag"},{n:"Quest (EUA)", v:19.5, elo:"diag"},
+      {n:"Sonic (Austrália)", v:17.5, elo:"diag"},{n:"Labcorp (EUA)", v:16.5, elo:"diag"},
+      {n:"RADL3 — Raia Drogasil", v:7, elo:"var"},{n:"CVS (EUA, consolid.)", v:5.5, elo:"var"},{n:"Walgreens (EUA)", v:3.5, elo:"var"}
+    ],
+    roic: [ // ROIC e WACC nominais em moeda local, % a.a. — ESTIMATIVAS próprias p/ discussão (FY24-25; refinar na fase CVM)
+      // WACC assumido: Brasil ~15 (Selic 15%, NTN-B longa ~7% real) · EUA ~8,5 · Índia ~11,5 · Europa ~7,5 · Ásia/Austrália ~9
+      {n:"SAUD3 — Bradsaúde (ROE vs Ke)", roic:25, wacc:17, br:true}, // pagadora: ROE 1T26 24,8% vs Ke ~17%; antiga ODPV3 standalone tinha ROIC ~30%
+      {n:"RADL3 — Raia Drogasil", roic:13, wacc:15, br:true},
+      {n:"HYPE3 — Hypera", roic:11, wacc:15, br:true},
+      {n:"RDOR3 — Rede D'Or", roic:10.5, wacc:15, br:true},
+      {n:"FLRY3 — Fleury", roic:10.5, wacc:15, br:true},
+      {n:"MATD3 — Mater Dei", roic:9, wacc:15, br:true},
+      {n:"HAPV3 — Hapvida (c/ goodwill)", roic:6, wacc:15, br:true},
+      {n:"HCA (EUA)", roic:18.5, wacc:8.5},
+      {n:"UnitedHealth (EUA)", roic:14, wacc:8.5},
+      {n:"Apollo (Índia)", roic:14, wacc:11.5},
+      {n:"Max Healthcare (Índia)", roic:13, wacc:11.5},
+      {n:"Quest (EUA)", roic:9, wacc:8.5},
+      {n:"IHH (Ásia)", roic:6.5, wacc:9},
+      {n:"CVS (EUA)", roic:5.5, wacc:8.5},
+      {n:"Fresenius (Alemanha)", roic:5.5, wacc:7.5},
+      {n:"Ramsay (Austrália)", roic:4.5, wacc:8.5}
+    ]
+  },
+  caged: { anos:[2019,2020,2021,2022,2023,2024,2025], saldo:[0.64,-0.19,2.78,2.04,1.48,1.69,1.40] }, // saldo anual de vagas formais, mi (MTE; 2025 aprox.)
+  selic: { anos:[2019,2020,2021,2022,2023,2024,2025], pct:[4.50,2.00,9.25,13.75,11.75,12.25,15.00] }, // meta Selic em dez de cada ano (BCB)
+  share: [ // beneficiários méd.-hosp. por registro ANS, mar/2026 (mi); grupo=true → grupo Hapvida
+    {t:"Hapvida", v:4.47, grupo:true},{t:"NotreDame Intermédica", v:4.17, grupo:true},
+    {t:"Bradesco Saúde (SAUD3)", v:4.06},{t:"Amil", v:3.50},{t:"SulAmérica (Rede D'Or)", v:3.17},
+    {t:"Seguros Unimed", v:0.97},{t:"Porto Seguro Saúde", v:0.76},{t:"Prevent Senior", v:0.55},{t:"Assim Saúde", v:0.46}
+  ],
+  modalidades: { // ANS/TABNET — série OFICIAL ANUAL: vidas méd.-hosp. por modalidade, dez de cada ano (mi)
+    anos:[2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025],
+    series:[
+      {n:"Medicina de grupo", v:[11.91,12.07,12.17,12.02,13.07,13.99,14.72,15.17,15.54,15.64,16.13,16.49,16.81,17.31,17.33,17.32,17.50,17.95,18.35,18.45,19.00,19.60,19.88,20.33,20.62,21.35]},
+      {n:"Cooperativas (Unimeds)", v:[7.99,8.39,8.61,9.31,10.04,11.02,12.05,13.14,14.27,15.12,16.45,17.22,17.90,18.59,19.32,18.77,17.77,17.39,17.24,17.19,17.30,17.85,18.55,18.86,18.92,18.74]},
+      {n:"Seguradoras", v:[4.64,4.62,4.39,4.43,4.28,4.05,3.97,4.26,4.81,4.92,5.32,5.90,6.53,7.03,7.39,6.83,6.38,6.00,5.94,6.09,5.95,6.27,6.66,6.56,6.78,7.30]},
+      {n:"Autogestão", v:[5.31,5.23,5.26,5.30,5.37,5.25,5.30,5.42,5.50,5.52,5.63,5.01,5.22,5.17,5.38,5.27,5.03,4.87,4.67,4.46,4.77,4.64,4.50,4.52,4.58,4.52]},
+      {n:"Filantropia", v:[1.12,1.11,1.08,1.01,1.08,1.13,1.21,1.33,1.35,1.36,1.40,1.40,1.40,1.39,1.11,1.08,1.00,0.94,0.92,0.88,0.93,0.92,0.95,1.00,1.07,1.07]}
+    ]
+  },
+  cobertura: { // ANS/TABNET — taxa de cobertura méd.-hosp., % da população (dez; 2026 = abr)
+    anos:[2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],
+    pct:[14.5,14.8,14.8,14.9,15.3,16.1,16.9,17.7,18.8,19.6,20.4,21.5,21.9,22.6,23.4,23.6,22.8,22.3,22.2,22.1,22.3,22.7,23.3,23.8,24.1,24.5,24.9]
+  },
+  operadoras: { // ANS Dados Gerais — operadoras COM beneficiários (dez; 2026 = abr)
+    anos:[2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],
+    mh:[790,766,749,727,711,703,692,680,673,671,667],
+    od:[305,291,289,280,260,254,241,238,234,225,223]
+  },
+  vcmh: { // IESS — VCMH 12m em dez de cada ano (2023 = set, última divulgação pública gratuita); IPCA fechado no ano
+    anos:[2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023],
+    pct:[8.3,11.0,12.5,7.6,12.9,15.4,16.0,15.8,19.3,20.4,16.5,17.3,14.5,-1.9,25.0,14.9,12.7],
+    ipca:[4.46,5.90,4.31,5.91,6.50,5.84,5.91,6.41,10.67,6.29,2.95,3.75,4.31,4.52,10.06,5.79,4.62]
+  },
+  gastopib: { // Conta-Satélite IBGE 2010–2021 (% do PIB, extraído do PDF oficial) + 2025e (ANAHP, rateio público/privado pela proporção em R$)
+    anos:["2010","2011","2012","2013","2014","2015","2016","2017","2018","2019","2020","2021","2025e"],
+    gov:[3.6,3.5,3.4,3.6,3.7,3.9,4.0,3.9,3.8,3.8,4.2,4.0,3.8],
+    fam:[4.4,4.3,4.5,4.6,4.9,5.2,5.3,5.4,5.7,5.8,5.9,5.7,5.2]
+  },
+  glosas: { labels:["Glosa inicial (mercado)","Glosa final (mercado)","Glosa inicial (afiliados Anahp)"], v:[8.6,7.6,11.9] }, // Anahp 2026
+  internacoes: { labels:["Geniturinárias","Neoplasias (câncer)","Ap. digestivo"], v:[10.16,10.04,8.85] }, // % das saídas, Anahp 2026
+  receitas: [ // R$ bi 2024-25e, aprox. (RDOR3 e SAUD3 = 2025)
+    {t:"RDOR3 (c/ SulAmérica)", v:60.0},{t:"SAUD3 (Bradsaúde)", v:52.0},{t:"RADL3", v:38.0},{t:"HAPV3", v:29.0},{t:"DASA3", v:15.5},
+    {t:"PGMN3", v:12.6},{t:"FLRY3", v:8.2},{t:"HYPE3", v:7.7},{t:"ONCO3", v:6.5},{t:"PNVL3", v:4.6},
+    {t:"VVEO3", v:4.0},{t:"MATD3", v:2.4},{t:"QUAL3", v:1.6},{t:"BLAU3", v:1.6}
+  ]
+};
+
+/* ---------- visual defaults ---------- */
+Chart.defaults.font.family = "Calibri,'Segoe UI',Candara,system-ui,sans-serif";
+Chart.defaults.color = "#52676e";
+Chart.defaults.borderColor = "#e4eaec";
+const ACC="#4a86d8", ACC2="#a9b6e4", BLUE="#44609c", AMBER="#b45309", RED="#b91c1c";
+
+/* ---------- tabs (charts são criados na 1ª exibição para manter o layout) ---------- */
+const built = {};
+document.querySelectorAll(".tabbtn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll("section.tab").forEach(s=>s.classList.remove("active"));
+    btn.classList.add("active");
+    const id = btn.dataset.tab;
+    document.getElementById(id).classList.add("active");
+    buildCharts(id);
+    window.scrollTo({top:0});
+  });
+});
+
+function buildCharts(tab){
+  if(built[tab]) return; built[tab]=true;
+  if(tab==="visao"){
+    new Chart(chGasto,{type:"doughnut",data:{labels:DATA.gasto.labels,datasets:[{data:DATA.gasto.valores,backgroundColor:[ACC,"#6e86a6"],borderWidth:0,hoverOffset:6}]},
+      options:{cutout:"62%",plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>` ${c.label}: R$ ${c.parsed} bi (${(100*c.parsed/(DATA.gasto.valores[0]+DATA.gasto.valores[1])).toFixed(0)}%)`}}}}});
+    new Chart(chBenef,{type:"line",data:{labels:DATA.beneficiarios.anos,datasets:[
+      {label:"Médico-hospitalar",data:DATA.beneficiarios.mi,borderColor:ACC,backgroundColor:"rgba(74,134,216,.12)",fill:true,tension:.35,pointRadius:2,pointBackgroundColor:ACC},
+      {label:"Excl. odontológico",data:DATA.beneficiarios.odonto,borderColor:BLUE,backgroundColor:"rgba(68,96,156,.07)",fill:true,tension:.35,pointRadius:2,pointBackgroundColor:BLUE}]},
+      options:{plugins:{legend:{position:"bottom"}},scales:{y:{suggestedMin:0}}}});
+    new Chart(chCobertura,{type:"line",data:{labels:DATA.cobertura.anos,datasets:[{label:"% da população",data:DATA.cobertura.pct,borderColor:ACC,backgroundColor:"rgba(74,134,216,.12)",fill:true,tension:.35,pointRadius:2,pointBackgroundColor:ACC}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y}% da população`}}},scales:{y:{suggestedMin:12,ticks:{callback:v=>v+"%"}}}}});
+    new Chart(chGastoPib,{type:"bar",data:{labels:DATA.gastopib.anos,datasets:[
+      {label:"Governo (SUS)",data:DATA.gastopib.gov,backgroundColor:BLUE,borderRadius:3},
+      {label:"Famílias e ISFL (privado)",data:DATA.gastopib.fam,backgroundColor:ACC,borderRadius:3}]},
+      options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{footer:its=>"Total: "+its.reduce((a,c)=>a+c.parsed.y,0).toFixed(1)+"% do PIB",label:c=>` ${c.dataset.label}: ${c.parsed.y}%`}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>v+"%"}}}}});
+  }
+  if(tab==="drivers"){
+    new Chart(chReajuste,{type:"bar",data:{labels:DATA.reajuste.anos,datasets:[
+      {label:"Teto ANS (individuais)",data:DATA.reajuste.ans,backgroundColor:DATA.reajuste.ans.map(v=>v<0?RED:ACC),borderRadius:3,order:2},
+      {label:"Média coletivos (ANS)",data:DATA.reajuste.coletivos,backgroundColor:BLUE,borderRadius:3,order:2},
+      {label:"IPCA",data:DATA.reajuste.ipca,type:"line",borderColor:AMBER,borderWidth:2,pointRadius:0,tension:.3,order:1}]},
+      options:{plugins:{legend:{position:"bottom"}},scales:{y:{ticks:{callback:v=>v+"%"}}}}});
+    new Chart(chSinistro,{type:"line",data:{labels:DATA.sinistralidade.anos,datasets:[
+      {label:"Sinistralidade",data:DATA.sinistralidade.pct,borderColor:BLUE,backgroundColor:"rgba(68,96,156,.08)",fill:true,tension:.35,pointRadius:3,pointBackgroundColor:BLUE},
+      {label:"Zona saudável (~82%)",data:DATA.sinistralidade.anos.map(()=>82),borderColor:ACC,borderDash:[6,5],pointRadius:0,fill:false}]},
+      options:{plugins:{legend:{position:"bottom"}},scales:{y:{suggestedMin:72,suggestedMax:96,ticks:{callback:v=>v+"%"}}}}});
+    new Chart(chDemo,{type:"line",data:{labels:DATA.demografia.anos,datasets:[{label:"% população 65+",data:DATA.demografia.pct65,borderColor:AMBER,backgroundColor:"rgba(180,83,9,.10)",fill:true,tension:.35,pointRadius:4,pointBackgroundColor:AMBER,segment:{borderDash:c=>c.p0.parsed.x>=4?[6,5]:undefined}}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y}%`+(c.label>2022?" (projeção)":"")}}},scales:{y:{ticks:{callback:v=>v+"%"}}}}});
+    new Chart(chVcmh,{type:"line",data:{labels:DATA.vcmh.anos,datasets:[
+      {label:"VCMH (12m)",data:DATA.vcmh.pct,borderColor:RED,backgroundColor:"rgba(185,28,28,.08)",fill:true,tension:.3,pointRadius:2,pointBackgroundColor:RED},
+      {label:"IPCA",data:DATA.vcmh.ipca,borderColor:AMBER,borderWidth:2,pointRadius:0,tension:.3,fill:false}]},
+      options:{plugins:{legend:{position:"bottom"}},scales:{y:{ticks:{callback:v=>v+"%"}}}}});
+  }
+  if(tab==="horizonte"){
+    const GC=[null,ACC,BLUE,AMBER]; // cor por grupo
+    const H=DATA.horizonte;
+    new Chart(chGantt,{type:"bar",data:{labels:H.map(d=>d.n),datasets:[{data:H.map(d=>[d.ini,d.fim]),backgroundColor:H.map(d=>GC[d.g]+"CC"),borderColor:H.map(d=>GC[d.g]),borderWidth:1,borderRadius:4,borderSkipped:false,barPercentage:.62}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const d=H[c.dataIndex];return ` ${d.ini}–${d.fim} · pico ~${d.pico} · ${d.r}`}}}},
+        scales:{x:{min:2025,max:2046,ticks:{stepSize:2}},y:{ticks:{font:{size:11}}}}}});
+    new Chart(chMatriz,{type:"bubble",data:{datasets:[{data:H.map(d=>({x:d.pico,y:d.imp,r:5+d.prev*3.2})),backgroundColor:H.map(d=>GC[d.g]+"99"),borderColor:H.map(d=>GC[d.g]),borderWidth:1.5}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const d=H[c.dataIndex];return ` ${d.n} · impacto ${d.imp}/5 · previsibilidade ${d.prev}/5`}}}},
+        scales:{x:{min:2025,max:2042,title:{display:true,text:"ano do pico de efeito"}},y:{min:0.5,max:5.5,ticks:{stepSize:1},title:{display:true,text:"impacto no P&L do setor (1–5)"}}}}});
+    new Chart(chCaged,{type:"bar",data:{labels:DATA.caged.anos,datasets:[{data:DATA.caged.saldo,backgroundColor:DATA.caged.saldo.map(v=>v<0?RED:ACC),borderRadius:3}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` saldo: ${c.parsed.y} mi de vagas`}}},scales:{y:{ticks:{callback:v=>v+" mi"}},x:{ticks:{font:{size:10}}}}}});
+    new Chart(chSelic,{type:"line",data:{labels:DATA.selic.anos,datasets:[{data:DATA.selic.pct,borderColor:BLUE,backgroundColor:"rgba(68,96,156,.08)",fill:true,tension:.3,pointRadius:3,pointBackgroundColor:BLUE}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` Selic (dez): ${c.parsed.y}%`}}},scales:{y:{ticks:{callback:v=>v+"%"}},x:{ticks:{font:{size:10}}}}}});
+  }
+  if(tab==="competicao"){
+    new Chart(chShare,{type:"bar",data:{labels:DATA.share.map(x=>x.t),datasets:[{data:DATA.share.map(x=>x.v),backgroundColor:DATA.share.map(x=>x.grupo?ACC:"#3e8c8c"),borderRadius:5}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.x} mi de vidas`}}},scales:{x:{ticks:{callback:v=>v+" mi"}}}}});
+    const CORES=[ACC,BLUE,"#6e86a6",AMBER,"#d9c8a8"];
+    new Chart(chModal,{type:"line",data:{labels:DATA.modalidades.anos,datasets:DATA.modalidades.series.map((s,i)=>({label:s.n,data:s.v,borderColor:CORES[i],backgroundColor:CORES[i]+"99",fill:true,tension:.3,pointRadius:0,borderWidth:1.5}))},
+      options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} mi`}}},scales:{y:{stacked:true,ticks:{callback:v=>v+" mi"}}}}});
+    new Chart(chOperadoras,{type:"line",data:{labels:DATA.operadoras.anos,datasets:[
+      {label:"Médico-hospitalares",data:DATA.operadoras.mh,borderColor:ACC,backgroundColor:"rgba(74,134,216,.10)",fill:true,tension:.3,pointRadius:3,pointBackgroundColor:ACC},
+      {label:"Excl. odontológicas",data:DATA.operadoras.od,borderColor:BLUE,backgroundColor:"rgba(68,96,156,.07)",fill:true,tension:.3,pointRadius:3,pointBackgroundColor:BLUE}]},
+      options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} operadoras`}}},scales:{y:{suggestedMin:150}}}});
+  }
+  if(tab==="hospitais"){
+    new Chart(chLeitos,{type:"line",data:{labels:DATA.leitos.anos,datasets:[
+      {label:"Total",data:DATA.leitos.total,borderColor:"#52676e",borderDash:[6,4],pointRadius:0,fill:false,tension:.3},
+      {label:"SUS",data:DATA.leitos.sus,borderColor:BLUE,backgroundColor:"rgba(68,96,156,.07)",fill:true,tension:.3,pointRadius:2,pointBackgroundColor:BLUE},
+      {label:"Não-SUS (privado)",data:DATA.leitos.total.map((t,i)=>t-DATA.leitos.sus[i]),borderColor:ACC,backgroundColor:"rgba(74,134,216,.10)",fill:true,tension:.3,pointRadius:2,pointBackgroundColor:ACC}]},
+      options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} mil leitos`}}},scales:{y:{ticks:{callback:v=>v+" mil"}}}}});
+    new Chart(chGlosa,{type:"bar",data:{labels:DATA.glosas.labels,datasets:[{data:DATA.glosas.v,backgroundColor:[AMBER,"#d9a868",RED],borderRadius:5}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y}% da receita`}}},scales:{y:{ticks:{callback:v=>v+"%"}}}}});
+    new Chart(chIntern,{type:"bar",data:{labels:DATA.internacoes.labels,datasets:[{data:DATA.internacoes.v,backgroundColor:[BLUE,ACC,"#6e86a6"],borderRadius:5}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y}% das saídas hospitalares`}}},scales:{y:{ticks:{callback:v=>v+"%"}}}}});
+  }
+  if(tab==="mundo"){
+    const M=DATA.mundo, hlBR=l=>l.includes("BRASIL")||l.includes("Brasil"), hlAU=l=>l.includes("Austrália");
+    new Chart(chMundoGasto,{type:"bar",data:{labels:M.gasto.paises,datasets:[
+      {label:"Público / compulsório",data:M.gasto.pub,backgroundColor:M.gasto.paises.map(p=>hlBR(p)?BLUE:(hlAU(p)?"#c98c2e":"#9fb0d8")),borderRadius:3},
+      {label:"Privado / voluntário",data:M.gasto.priv,backgroundColor:M.gasto.paises.map(p=>hlBR(p)?ACC:(hlAU(p)?"#e8b96a":"#a8c8c0")),borderRadius:3}]},
+      options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{footer:its=>"Total: "+its.reduce((a,c)=>a+c.parsed.y,0).toFixed(1)+"% do PIB",label:c=>` ${c.dataset.label}: ${c.parsed.y}%`}}},
+        scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,ticks:{callback:v=>v+"%"}}}}});
+    new Chart(chMundoLeitos,{type:"bar",data:{labels:M.leitos.paises,datasets:[{data:M.leitos.v,backgroundColor:M.leitos.paises.map(p=>hlBR(p)?ACC:(hlAU(p)?AMBER:"#6e86a6")),borderRadius:4}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.x} leitos / 1.000 hab`}}},scales:{x:{ticks:{callback:v=>v}}}}});
+    new Chart(chMundoMLR,{type:"bar",data:{labels:M.mlr.labels,datasets:[{data:M.mlr.v,backgroundColor:M.mlr.labels.map(l=>l.includes("Brasil")?ACC:(l.includes("ACA")?"#d9c8a8":BLUE)),borderRadius:4}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.x}% do prêmio gasto em saúde`}}},scales:{x:{min:70,max:95,ticks:{callback:v=>v+"%"}},y:{ticks:{font:{size:10.5}}}}}});
+    new Chart(chMundoTrend,{type:"bar",data:{labels:M.trend.labels,datasets:[{data:M.trend.v,backgroundColor:M.trend.labels.map(l=>l.includes("Brasil")?ACC:(l==="Global"?AMBER:"#9fb0d8")),borderRadius:4}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y}% a.a.`}}},scales:{y:{ticks:{callback:v=>v+"%"}},x:{ticks:{font:{size:10}}}}}});
+    const EC={hosp:[ACC,BLUE],diag:[ACC,"#7a93c9"],var:[ACC,"#b8a888"]};
+    new Chart(chMundoMargens,{type:"bar",data:{labels:M.margens.map(x=>x.n),datasets:[{data:M.margens.map(x=>x.v),
+      backgroundColor:M.margens.map(x=>x.n.includes("3 —")||x.n.startsWith("MATD")||x.n.startsWith("RDOR")||x.n.startsWith("FLRY")||x.n.startsWith("RADL")?ACC:(x.elo==="hosp"?BLUE:(x.elo==="diag"?"#7a93c9":"#b8a888"))),borderRadius:4}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` margem EBITDA ~${c.parsed.x}%`}}},scales:{x:{ticks:{callback:v=>v+"%"}},y:{ticks:{font:{size:11}}}}}});
+    const R=M.roic, RD=[...M.roic].sort((a,b)=>(b.roic-b.wacc)-(a.roic-a.wacc));
+    new Chart(chRoicScatter,{type:"bar",data:{labels:RD.map(d=>d.n),datasets:[{data:RD.map(d=>[d.wacc,d.roic]),
+      backgroundColor:RD.map(d=>d.roic>=d.wacc?"rgba(74,134,216,.78)":"rgba(185,28,28,.62)"),
+      borderColor:RD.map(d=>d.roic>=d.wacc?ACC:RED),borderWidth:1,borderRadius:5,borderSkipped:false,barPercentage:.6}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const d=RD[c.dataIndex];return [` WACC ~${d.wacc}% → ROIC ~${d.roic}%`,` spread: ${(d.roic-d.wacc)>0?"+":""}${(d.roic-d.wacc).toFixed(1)} p.p.`]}}}},
+        scales:{x:{min:0,max:32,title:{display:true,text:"% a.a. (nominal, moeda local) — barra vai do WACC ao ROIC"},ticks:{callback:v=>v+"%"}},y:{ticks:{font:{size:10.5}}}}}});
+    const RS=RD;
+    new Chart(chSpread,{type:"bar",data:{labels:RS.map(d=>d.n),datasets:[{data:RS.map(d=>+(d.roic-d.wacc).toFixed(1)),backgroundColor:RS.map(d=>d.br?ACC:BLUE),borderRadius:4}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` spread: ${c.parsed.x>0?"+":""}${c.parsed.x} p.p.`}}},scales:{x:{ticks:{callback:v=>v+" pp"},grid:{color:ctx=>ctx.tick.value===0?"#52676e":"#e4eaec"}},y:{ticks:{font:{size:10.5}}}}}});
+  }
+  if(tab==="players"){
+    const r=[...DATA.receitas].sort((a,b)=>b.v-a.v);
+    new Chart(chReceita,{type:"bar",data:{labels:r.map(x=>x.t),datasets:[{data:r.map(x=>x.v),backgroundColor:r.map((x,i)=>i<3?ACC:"#3e8c8c"),borderRadius:5}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` R$ ${c.parsed.x} bi`}}},scales:{x:{ticks:{callback:v=>"R$ "+v+" bi"}}}}});
+  }
+}
+buildCharts("visao");
+
+/* ===== Exportação para Excel (.xlsx) ===== */
+(function(){
+  const norm = l => Array.isArray(l) ? l.join(" ") : (l==null ? "" : String(l));
+  function titleFor(x){
+    const c = (typeof x==="string") ? document.getElementById(x) : x;
+    if(!c) return "grafico";
+    let h = c.closest(".card") && c.closest(".card").querySelector("h3");
+    if(!h){ let el = c.closest(".chartbox"); while(el && el.previousElementSibling){ el = el.previousElementSibling; if(/^H[234]$/.test(el.tagName)){ h = el; break; } } }
+    return (h ? norm(h.textContent) : c.id).trim();
+  }
+  function aoaFromChart(chart){
+    const d = chart.data || {}, labels = (d.labels||[]).map(norm), dsets = d.datasets || [];
+    const isXY = dsets.some(s => (s.data||[]).some(v => v && typeof v==="object" && ("x" in v || "y" in v)));
+    const aoa = [];
+    if(isXY){
+      aoa.push(["Série","x","y"]);
+      dsets.forEach((s,i)=>(s.data||[]).forEach(v=>aoa.push([s.label||("Série "+(i+1)), (v&&typeof v==="object"?v.x:v), (v&&typeof v==="object"?v.y:"")])));
+    } else {
+      let n = labels.length; dsets.forEach(s=>{ n = Math.max(n, (s.data||[]).length); });
+      aoa.push(["Categoria", ...dsets.map((s,i)=> s.label || ("Série "+(i+1)))]);
+      for(let i=0;i<n;i++){
+        aoa.push([ labels[i]!==undefined ? labels[i] : i, ...dsets.map(s=>{ const v=(s.data||[])[i]; return (v && typeof v==="object") ? (v.y!==undefined?v.y:JSON.stringify(v)) : (v==null?"":v); }) ]);
+      }
+    }
+    return aoa;
+  }
+  const sheetName = t => (t.replace(/[\\\/?*\[\]:]/g," ").replace(/\s+/g," ").trim().slice(0,28) || "dados");
+  const fileName  = t => (t.replace(/[\\\/?*\[\]:<>|"]/g," ").replace(/\s+/g," ").trim().slice(0,70) || "grafico");
+  const wsFromChart = chart => XLSX.utils.aoa_to_sheet(aoaFromChart(chart));
+
+  window.exportChart = function(id){
+    if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou (precisa de internet na 1ª vez)."); return; }
+    const chart = Chart.getChart(id);
+    if(!chart){ alert("Esse gráfico ainda não foi carregado. Abra a aba dele e tente de novo."); return; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsFromChart(chart), sheetName(titleFor(id)));
+    XLSX.writeFile(wb, fileName(titleFor(id))+".xlsx");
+  };
+  window.exportAll = function(){
+    if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou (precisa de internet na 1ª vez)."); return; }
+    ["visao","recap","drivers","horizonte","historia","competicao","hospitais","mundo","players","premissas","fontes"].forEach(t=>{ try{ buildCharts(t); }catch(e){} });
+    const wb = XLSX.utils.book_new(), used = {}; let n = 0;
+    document.querySelectorAll("canvas").forEach(c=>{
+      const chart = Chart.getChart(c); if(!chart) return;
+      let nm = sheetName(titleFor(c)), base = nm, k = 2;
+      while(used[nm.toLowerCase()]){ nm = (base.slice(0,25)+" "+k); k++; }
+      used[nm.toLowerCase()] = 1;
+      try{ XLSX.utils.book_append_sheet(wb, wsFromChart(chart), nm); n++; }catch(e){}
+    });
+    if(!n){ alert("Nenhum gráfico disponível para exportar."); return; }
+    XLSX.writeFile(wb, "dashboard-saude-dados.xlsx");
+  };
+
+  function inject(){
+    document.querySelectorAll(".chartbox").forEach(box=>{
+      if(box.querySelector(".xlsbtn")) return;
+      const c = box.querySelector("canvas"); if(!c) return;
+      const b = document.createElement("button");
+      b.className = "xlsbtn"; b.type = "button"; b.textContent = "⤓ Excel";
+      b.title = "Baixar os dados deste gráfico (.xlsx)";
+      b.addEventListener("click", e=>{ e.stopPropagation(); window.exportChart(c.id); });
+      box.appendChild(b);
+    });
+    if(!document.querySelector(".xls-all")){
+      const g = document.createElement("button");
+      g.className = "xls-all"; g.type = "button"; g.textContent = "⤓ Baixar dados (Excel)";
+      g.title = "Baixar todas as séries do dashboard num único arquivo .xlsx";
+      g.addEventListener("click", window.exportAll);
+      document.body.appendChild(g);
+    }
+  }
+  if(document.readyState!=="loading") inject(); else document.addEventListener("DOMContentLoaded", inject);
+})();
+</script>
+</body>
+</html>
